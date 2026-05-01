@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Tunisia Platform — MatchDar + ClimaTN</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --ink:#1c1612;--ink2:#3a3028;--muted:#8c7e70;--border:#e2d8cc;
+  --bg:#faf7f3;--surface:#fff;--warm:#f5ede0;--warm2:#ede0cc;
+  --orange:#d4540a;--orange2:#f07030;--orange-l:#fff0e6;
+  --low:#2d7a3e;--mod:#c47a18;--high:#c85020;--vhigh:#9e1e1e;
+  --blue:#205a8b;--teal:#1a7a6a;--purple:#6d3fa0;
+  --shadow:0 1px 4px rgba(28,22,18,.07),0 2px 12px rgba(28,22,18,.05);
+  --shadow-lg:0 8px 32px rgba(28,22,18,.14);
+  --r:10px;--serif:'DM Serif Display',serif;
+  --sans:'DM Sans',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+
+/* ── SWITCHER ── */
+.sw{position:fixed;bottom:1.5rem;right:1.5rem;z-index:999;display:flex;gap:.4rem;
+    background:var(--ink);padding:.45rem;border-radius:12px;box-shadow:0 8px 32px rgba(28,22,18,.4)}
+.sw-btn{font-family:var(--serif);font-size:.88rem;padding:.45rem 1.1rem;border:none;
+        border-radius:8px;cursor:pointer;transition:all .15s;color:#8c7e70;background:transparent}
+.sw-btn.active{background:var(--orange);color:#fff;box-shadow:0 2px 12px rgba(212,84,10,.4)}
+
+/* ── SHARED HEADER ── */
+.hdr{background:var(--ink);color:#f5ede0;padding:0 2rem;height:58px;
+     display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.hdr-logo{font-family:var(--serif);font-size:1.5rem}
+.hdr-logo em{color:#f09050;font-style:italic}
+.hdr-right{display:flex;align-items:center;gap:1.2rem}
+.hdr-stat{font-family:var(--mono);font-size:.62rem;color:#6b5f50}
+.hdr-stat b{color:#e8c89a}
+.api-badge{font-family:var(--mono);font-size:.62rem;padding:.25rem .8rem;border-radius:3px;text-transform:uppercase;letter-spacing:.06em}
+.api-badge.live{background:rgba(45,122,62,.2);color:#2d7a3e;border:1px solid rgba(45,122,62,.4)}
+.api-badge.sim{background:rgba(196,122,24,.15);color:#c47a18;border:1px solid rgba(196,122,24,.35)}
+
+/* ── TABS ── */
+.tabs{background:var(--ink);border-bottom:1px solid #2a221a;padding:0 2rem;display:flex}
+.tab{font-family:var(--mono);font-size:.63rem;letter-spacing:.1em;text-transform:uppercase;
+     color:#6b5f50;padding:.7rem 1.1rem;cursor:pointer;border:none;background:none;
+     border-bottom:2px solid transparent;transition:.15s}
+.tab:hover{color:#c8b89a}
+.tab.on{color:#f09050;border-bottom-color:#f09050}
+
+/* ── FORM ELEMENTS ── */
+label.lbl{font-family:var(--mono);font-size:.58rem;text-transform:uppercase;
+          letter-spacing:.1em;color:var(--muted);display:block;margin-bottom:.28rem}
+input[type=number],input[type=text],select{
+  width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:.44rem .65rem;font-family:var(--sans);font-size:.82rem;color:var(--ink);
+  transition:border-color .15s,box-shadow .15s;appearance:none;-webkit-appearance:none}
+input:focus,select:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px rgba(212,84,10,.1)}
+.tbtn{font-family:var(--mono);font-size:.62rem;padding:.28rem .7rem;border:1px solid var(--border);
+      border-radius:4px;background:var(--surface);color:var(--muted);cursor:pointer;transition:.12s;letter-spacing:.04em}
+.tbtn:hover{border-color:var(--orange);color:var(--orange)}
+.tbtn.on{background:var(--ink);color:#f5ede0;border-color:var(--ink)}
+.search-btn{width:100%;background:var(--orange);color:#fff;border:none;border-radius:8px;
+            padding:.9rem;font-family:var(--serif);font-size:1.05rem;cursor:pointer;
+            transition:all .15s;letter-spacing:.01em}
+.search-btn:hover{background:#b8420a;transform:translateY(-1px);box-shadow:var(--shadow)}
+.search-btn:disabled{background:var(--muted);transform:none;cursor:not-allowed}
+
+/* ── LOADING ── */
+.loading{display:flex;align-items:center;justify-content:center;padding:3rem;gap:.7rem;
+         color:var(--muted);font-family:var(--mono);font-size:.7rem}
+.spin-el{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--orange);
+         border-radius:50%;animation:spin .65s linear infinite}
+.skeleton{background:linear-gradient(90deg,var(--warm) 25%,var(--warm2) 50%,var(--warm) 75%);
+          background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:4px}
+
+/* ── KPI CARDS ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.9rem;margin-bottom:1.4rem}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+     padding:1.2rem;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi:nth-child(1)::before{background:var(--orange)}
+.kpi:nth-child(2)::before{background:var(--blue)}
+.kpi:nth-child(3)::before{background:var(--teal)}
+.kpi:nth-child(4)::before{background:var(--mod)}
+.kpi-lbl{font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.5rem}
+.kpi-val{font-family:var(--serif);font-size:1.8rem;color:var(--orange);line-height:1}
+.kpi-sub{font-family:var(--mono);font-size:.65rem;color:var(--muted);margin-top:.3rem}
+
+/* ── CHARTS ── */
+.chart-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.9rem}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.2rem;box-shadow:var(--shadow)}
+.chart-card.wide{grid-column:1/-1}
+.chart-card.two{grid-column:span 2}
+.chart-title{font-family:var(--serif);font-size:.9rem;margin-bottom:.9rem}
+.chart-box{position:relative;height:200px}
+.chart-box.tall{height:280px}
+
+/* ── MATCHDAR SPECIFIC ── */
+.msearch-shell{display:grid;grid-template-columns:370px 1fr;min-height:calc(100vh - 100px)}
+.mform{background:var(--warm);border-right:1px solid var(--border);overflow-y:auto;max-height:calc(100vh - 100px)}
+.mform::-webkit-scrollbar{width:3px}
+.mform::-webkit-scrollbar-thumb{background:var(--warm2)}
+.fsec{border-bottom:1px solid var(--border);padding:1.1rem 1.4rem}
+.fsec-title{font-family:var(--serif);font-size:.92rem;margin-bottom:.85rem;display:flex;align-items:center;gap:.4rem}
+.frow2{display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.55rem}
+.frow1{margin-bottom:.55rem}
+.price-hint{font-family:var(--mono);font-size:.6rem;color:var(--muted);padding:.3rem .5rem;
+            background:rgba(212,84,10,.06);border-radius:4px;border-left:2px solid var(--orange2);
+            margin-top:.35rem;display:none}
+.price-hint.show{display:block}
+
+/* ── RESULTS ── */
+.mresults{overflow-y:auto;max-height:calc(100vh - 100px);background:var(--bg)}
+.mresults::-webkit-scrollbar{width:3px}
+.mresults::-webkit-scrollbar-thumb{background:var(--border)}
+.res-hdr{background:var(--warm);border-bottom:1px solid var(--border);padding:.9rem 1.4rem;
+         display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.res-hdr-title{font-family:var(--serif);font-size:1.05rem}
+.res-hdr-meta{font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-top:.12rem}
+.pbadge{font-family:var(--mono);font-size:.54rem;padding:.18rem .55rem;border-radius:3px;text-transform:uppercase;letter-spacing:.06em}
+
+/* ── PROPERTY CARDS ── */
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:.7rem;padding:.7rem;align-content:start}
+.pcard{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+       overflow:hidden;cursor:pointer;transition:all .18s;box-shadow:var(--shadow);
+       animation:fadeUp .25s ease both}
+.pcard:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:var(--orange)}
+
+/* Card image */
+.pcard-img{width:100%;height:160px;object-fit:cover;display:block}
+.pcard-no-img{width:100%;height:130px;background:var(--warm);display:flex;align-items:center;
+              justify-content:center;font-size:2.5rem;opacity:.4}
+.pcard-head{background:var(--warm);padding:.85rem 1rem .7rem;border-bottom:1px solid var(--border);position:relative}
+.pcard-rank{position:absolute;top:.7rem;left:.7rem;background:var(--ink);color:#f5ede0;
+            font-family:var(--mono);font-size:.58rem;width:22px;height:22px;border-radius:50%;
+            display:flex;align-items:center;justify-content:center}
+.pcard-type{font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.25rem;padding-left:28px}
+.pcard-city{font-family:var(--serif);font-size:1rem;line-height:1.2}
+.pcard-neigh{font-size:.72rem;color:var(--muted);margin-top:.1rem}
+.score-pill{position:absolute;top:.7rem;right:.7rem;background:var(--orange);color:#fff;
+            font-family:var(--mono);font-size:.65rem;padding:.2rem .55rem;border-radius:20px}
+.pcard-body{padding:.85rem 1rem}
+.pcard-price{font-family:var(--serif);font-size:1.22rem;color:var(--orange);margin-bottom:.45rem}
+.pcard-specs{display:flex;gap:.65rem;font-family:var(--mono);font-size:.62rem;color:var(--muted);flex-wrap:wrap;margin-bottom:.6rem}
+.pcard-tags{display:flex;flex-wrap:wrap;gap:.28rem}
+.tag{font-family:var(--mono);font-size:.54rem;padding:.18rem .48rem;border-radius:3px;background:var(--warm);color:var(--muted);border:1px solid var(--border)}
+.tag.g{background:#eaf3eb;color:#2d7a3e;border-color:#b8dcc0}
+.tag.b{background:#eaf0f8;color:#205a8b;border-color:#b8cedc}
+.tag.p{background:#f0e8f8;color:#6d3fa0;border-color:#d0b8e8}
+.risk-chip{font-family:var(--mono);font-size:.54rem;padding:.18rem .48rem;border-radius:3px;font-weight:600}
+.score-bars{border-top:1px solid var(--border);padding:.55rem 1rem;display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem}
+.sbar{text-align:center}
+.sbar-val{font-family:var(--mono);font-size:.72rem;font-weight:500}
+.sbar-track{height:3px;background:var(--warm2);border-radius:2px;margin:.25rem 0 .15rem;overflow:hidden}
+.sbar-fill{height:100%;border-radius:2px}
+.sbar-lbl{font-size:.56rem;color:var(--muted)}
+
+/* ── COMPARE PANEL ── */
+.compare-panel{display:none;position:fixed;bottom:5rem;right:1.5rem;z-index:500;
+               background:var(--ink);color:#f5ede0;padding:1rem;border-radius:var(--r);
+               box-shadow:var(--shadow-lg);min-width:220px;max-width:280px}
+.compare-panel.show{display:block}
+.compare-panel-title{font-family:var(--serif);font-size:.9rem;margin-bottom:.6rem;color:#f09050}
+.compare-item{font-family:var(--mono);font-size:.65rem;padding:.25rem 0;border-bottom:1px solid #2a221a;
+              display:flex;justify-content:space-between;align-items:center}
+.compare-remove{cursor:pointer;color:#8b7560;margin-left:.5rem}
+.compare-remove:hover{color:#f5ede0}
+.compare-btn{width:100%;margin-top:.6rem;background:var(--orange);color:#fff;border:none;
+             border-radius:5px;padding:.4rem;font-family:var(--mono);font-size:.65rem;cursor:pointer}
+
+/* ── PLACEHOLDER ── */
+.placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;
+             height:60vh;color:var(--muted);text-align:center;gap:.65rem;padding:2rem}
+.placeholder h2{font-family:var(--serif);font-size:1.35rem;color:var(--ink2)}
+.placeholder p{font-size:.82rem;max-width:280px;line-height:1.7}
+
+/* ── MODAL ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(28,22,18,.55);z-index:300;
+          padding:1.5rem;overflow-y:auto;backdrop-filter:blur(6px);align-items:flex-start;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:var(--surface);border-radius:14px;width:100%;max-width:720px;
+       box-shadow:var(--shadow-lg);animation:fadeUp .2s ease;overflow:hidden;margin:auto}
+.modal-hdr{background:var(--ink);color:#f5ede0;padding:1.3rem 1.5rem;
+           display:flex;justify-content:space-between;align-items:flex-start}
+.modal-title{font-family:var(--serif);font-size:1.4rem}
+.modal-sub{font-size:.75rem;color:#8b7560;margin-top:.2rem}
+.modal-close{background:none;border:none;cursor:pointer;color:#8b7560;font-size:1.1rem;transition:.12s;padding:.2rem}
+.modal-close:hover{color:#f5ede0}
+.modal-body{padding:1.4rem}
+.modal-price{font-family:var(--serif);font-size:2rem;color:var(--orange);margin-bottom:.9rem}
+.detail-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-bottom:1.1rem}
+.di{background:var(--warm);border-radius:7px;padding:.6rem;border:1px solid var(--border)}
+.di-lbl{font-family:var(--mono);font-size:.54rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.15rem}
+.di-val{font-weight:600;font-size:.82rem}
+
+.sim-title{font-family:var(--serif);font-size:.92rem;margin-bottom:.65rem;padding-bottom:.45rem;border-bottom:1px solid var(--border)}
+.sim-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.55rem}
+.sim-card{background:var(--warm);border:1px solid var(--border);border-radius:7px;padding:.7rem;cursor:pointer;transition:all .12s}
+.sim-card:hover{border-color:var(--orange);background:var(--surface)}
+
+/* ── COMPARE MODAL ── */
+.cmp-modal-body{padding:1.4rem;overflow-x:auto}
+.cmp-tbl{width:100%;border-collapse:collapse;font-size:.82rem}
+.cmp-tbl th{font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;
+            color:var(--muted);padding:.5rem .7rem;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap}
+.cmp-tbl td{padding:.55rem .7rem;border-bottom:1px solid rgba(226,216,204,.5);vertical-align:middle}
+.cmp-tbl tr:hover td{background:var(--warm)}
+.win-cell{color:var(--low);font-weight:700}
+
+/* ── CLIMATN ── */
+.csidebar{background:var(--warm);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;max-height:calc(100vh - 100px)}
+.csidebar-label{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);padding:1rem 1.3rem .7rem;border-bottom:1px solid var(--border)}
+.city-list{overflow-y:auto;flex:1;padding:.4rem}
+.city-list::-webkit-scrollbar{width:3px}
+.city-btn{width:100%;display:flex;align-items:center;gap:.65rem;padding:.6rem .7rem;background:none;
+          border:1px solid transparent;border-radius:7px;cursor:pointer;color:var(--ink);
+          font-family:var(--sans);font-size:.83rem;font-weight:500;transition:all .13s;text-align:left;margin-bottom:2px}
+.city-btn:hover{background:var(--warm2);border-color:var(--border)}
+.city-btn.on{background:var(--orange-l);border-color:var(--orange);color:var(--orange)}
+.risk-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.city-region{font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-left:auto}
+
+.chero{background:var(--surface);border-bottom:1px solid var(--border);padding:1.4rem 2rem;
+       display:flex;align-items:flex-start;justify-content:space-between;gap:2rem}
+.chero-name{font-family:var(--serif);font-size:2.8rem;line-height:1;letter-spacing:-.02em}
+.chero-meta{font-family:var(--mono);font-size:.65rem;color:var(--muted);margin-top:.4rem}
+.chero-temp{font-family:var(--mono);font-size:3.8rem;font-weight:500;line-height:1;color:var(--orange)}
+.chero-cond{font-size:.8rem;color:var(--muted);text-align:right;margin-top:.25rem}
+.chero-badges{display:flex;gap:.4rem;margin-top:.5rem;flex-wrap:wrap}
+
+.risk-strip{display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-bottom:1px solid var(--border)}
+.rc{padding:1rem 1.3rem;border-right:1px solid var(--border);position:relative;overflow:hidden}
+.rc:last-child{border-right:none}
+.rc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.rc.flood::before{background:#3b82f6}.rc.heat::before{background:var(--orange)}
+.rc.quake::before{background:#7c3aed}.rc.drought::before{background:var(--mod)}
+.rc-lbl{font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.45rem}
+.rc-val{font-family:var(--serif);font-size:1.35rem}
+.rc-sub{font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.15rem}
+
+.cdash{display:grid;grid-template-columns:1fr 1fr}
+.cpanel{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:1.3rem 1.4rem;background:var(--surface)}
+.cpanel:nth-child(even){border-right:none}
+.cpanel.cfull{grid-column:1/-1;border-right:none}
+.panel-title{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.14em;
+             color:var(--muted);margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+.panel-title::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--orange);display:inline-block}
+
+.wx-grid{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}
+.wx-card{background:var(--warm);border:1px solid var(--border);border-radius:8px;padding:.8rem .9rem}
+.wx-icon{font-size:1.2rem;margin-bottom:.25rem}
+.wx-val{font-family:var(--mono);font-size:1.2rem;font-weight:500;color:var(--orange)}
+.wx-lbl{font-size:.7rem;color:var(--muted);margin-top:.08rem}
+
+.gauge-list{display:flex;flex-direction:column;gap:.7rem}
+.gauge-item{display:flex;align-items:center;gap:.9rem}
+.g-name{font-size:.8rem;font-weight:500;width:72px;flex-shrink:0}
+.g-track{flex:1;height:7px;background:var(--warm2);border-radius:4px;overflow:hidden}
+.g-fill{height:100%;border-radius:4px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+.g-level{font-family:var(--mono);font-size:.62rem;width:72px;text-align:right;flex-shrink:0}
+
+.sust-bar-wrap{margin-top:1rem;background:var(--warm);border:1px solid var(--border);border-radius:8px;padding:.9rem 1rem}
+.sust-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}
+.sust-grade{font-family:var(--serif);font-size:2rem;font-weight:700}
+.sust-score{font-family:var(--mono);font-size:1.1rem;color:var(--orange)}
+.sust-track{height:8px;background:var(--warm2);border-radius:4px;overflow:hidden}
+.sust-fill{height:100%;border-radius:4px;transition:width 1s}
+
+.idx-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.65rem}
+.idx-card{background:var(--warm);border:1px solid var(--border);border-radius:8px;padding:.9rem;position:relative;overflow:hidden}
+.idx-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.idx-card.ic-flood::before{background:#3b82f6}
+.idx-card.ic-heat::before{background:var(--orange)}
+.idx-card.ic-drought::before{background:var(--mod)}
+.idx-title{font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.4rem}
+.idx-val{font-family:var(--mono);font-size:1.5rem;font-weight:500}
+.idx-level{font-size:.72rem;font-weight:600;margin-top:.25rem}
+.idx-detail{font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.35rem}
+
+.fc-row{display:flex;gap:.45rem;overflow-x:auto;padding-bottom:.4rem}
+.fc-row::-webkit-scrollbar{height:3px}
+.fc-day{flex-shrink:0;background:var(--warm);border:1px solid var(--border);border-radius:8px;padding:.7rem .8rem;text-align:center;min-width:82px}
+.fc-name{font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.fc-hi{font-family:var(--serif);font-size:1.1rem;color:var(--orange);margin:.28rem 0 .08rem}
+.fc-lo{font-family:var(--mono);font-size:.7rem;color:var(--muted)}
+.fc-rain{font-family:var(--mono);font-size:.58rem;color:var(--blue);margin-top:.35rem}
+.fc-uv{font-size:.58rem;color:var(--muted)}
+
+.hist-wrap{position:relative;height:200px}
+.cmp-chart-box{position:relative;height:280px;margin-bottom:1.5rem}
+.cmp-table{width:100%;border-collapse:collapse}
+.cmp-table th{font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:.5rem .8rem;text-align:left;border-bottom:2px solid var(--border);white-space:nowrap}
+.cmp-table td{padding:.65rem .8rem;border-bottom:1px solid rgba(226,216,204,.5);font-size:.82rem;vertical-align:middle}
+.cmp-table tr:hover td{background:var(--warm);cursor:pointer}
+.rchip{font-family:var(--mono);font-size:.57rem;padding:.18rem .52rem;border-radius:3px;font-weight:600;letter-spacing:.04em;display:inline-block}
+
+.cdash-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:.9rem;margin-bottom:1.5rem}
+.cdash-charts{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin-bottom:.9rem}
+.cdash-chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.2rem;box-shadow:var(--shadow)}
+.cdash-chart-card.full{grid-column:1/-1}
+.cdash-chart-title{font-family:var(--serif);font-size:.9rem;margin-bottom:.9rem}
+.cdash-chart-box{position:relative;height:220px}
+.city-risk-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.city-risk-table th{font-family:var(--mono);font-size:.57rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:.45rem .75rem;text-align:left;border-bottom:2px solid var(--border)}
+.city-risk-table td{padding:.55rem .75rem;border-bottom:1px solid rgba(226,216,204,.4);vertical-align:middle}
+.city-risk-table tr:hover td{background:var(--warm);cursor:pointer}
+.sust-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;font-family:var(--mono);font-size:.68rem;font-weight:700}
+
+/* ── INSIGHTS TAB ── */
+.insights-wrap{padding:1.5rem;overflow-y:auto;max-height:calc(100vh - 100px)}
+
+/* Leaflet Map */
+#tunisiaMap { height: 480px; border-radius: var(--r); border: 1px solid var(--border); z-index: 1; }
+.leaflet-popup-content-wrapper { font-family: var(--sans); border-radius: 8px; box-shadow: var(--shadow-lg); border: 1px solid var(--border); }
+.leaflet-popup-content { margin: 0; padding: 0; }
+.map-popup { padding: 0.85rem 1rem; min-width: 200px; }
+.map-popup-city { font-family: var(--serif); font-size: 1rem; margin-bottom: 0.3rem; }
+.map-popup-risk { font-family: var(--mono); font-size: 0.62rem; margin-bottom: 0.5rem; }
+.map-risk-bar { height: 5px; border-radius: 3px; margin: 0.3rem 0; background: var(--warm2); overflow: hidden; }
+.map-risk-fill { height: 100%; border-radius: 3px; }
+.map-popup-go { font-family: var(--mono); font-size: 0.6rem; color: var(--orange); cursor: pointer; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.4rem; display: inline-block; }
+
+</style>
+</head>
+<body>
+
+<!-- APP SWITCHER -->
+<div class="sw">
+  <button class="sw-btn" id="swMatch" onclick="switchApp('match')">🏠 Match<em style="font-style:italic;color:#f09050">Dar</em></button>
+  <button class="sw-btn active" id="swClima" onclick="switchApp('clima')">🌡 Clima<em style="font-style:italic;color:#f09050">TN</em></button>
+</div>
+
+<!-- ═══════════════════════════ MATCHDAR ═══════════════════════════ -->
+<div id="appMatch">
+  <header class="hdr">
+    <div class="hdr-logo">Match<em>Dar</em></div>
+    <div class="hdr-right">
+      <div class="hdr-stat">Listings: <b id="mTotal">—</b></div>
+      <div class="hdr-stat">Avg: <b id="mAvg">—</b> TND</div>
+    </div>
+  </header>
+  <div class="tabs">
+    <button class="tab on" data-mtab="search" onclick="switchMTab(this,'search')">🔍 Search & Match</button>
+    <button class="tab" data-mtab="insights" onclick="switchMTab(this,'insights')">📊 Insights</button>
+  </div>
+
+  <!-- SEARCH TAB -->
+  <div id="mTabSearch">
+    <div class="msearch-shell">
+      <aside class="mform">
+        <div class="fsec">
+          <div class="fsec-title">🏠 Property Type</div>
+          <div style="display:flex;flex-wrap:wrap;gap:.4rem" id="ptypeRow">
+            <button class="tbtn on" data-v="Any">Any</button>
+            <button class="tbtn" data-v="Apartment">Apartment</button>
+            <button class="tbtn" data-v="House">House</button>
+            <button class="tbtn" data-v="Land">Land</button>
+          </div>
+        </div>
+
+        <div class="fsec">
+          <div class="fsec-title">💰 Budget (TND)</div>
+          <div class="frow2">
+            <div><label class="lbl">Minimum</label><input type="number" id="bmin" placeholder="50,000" step="5000"></div>
+            <div><label class="lbl">Maximum</label><input type="number" id="bmax" placeholder="500,000" step="5000"></div>
+          </div>
+          <div class="price-hint" id="priceHint">💡 <span id="phText"></span></div>
+        </div>
+
+        <div class="fsec">
+          <div class="fsec-title">📍 Location</div>
+          <div class="frow1">
+            <label class="lbl">Region / City</label>
+            <select id="citySelect" onchange="onLocChange()">
+              <option value="Any">— Any Location —</option>
+              <optgroup label="▸ Major Regions">
+                <option value="Grand Tunis">Grand Tunis (Tunis + all suburbs)</option>
+                <option value="Grand Sousse">Grand Sousse</option>
+                <option value="Grand Sfax">Grand Sfax</option>
+                <option value="Cap Bon">Cap Bon (Nabeul + Hammamet)</option>
+                <option value="Monastir-Mahdia">Monastir - Mahdia</option>
+                <option value="Bizerte">Bizerte</option>
+                <option value="Nord-Ouest">Nord-Ouest (Béja, Jendouba, Kef)</option>
+                <option value="Centre">Centre (Kairouan, Kasserine)</option>
+                <option value="Sud">Sud (Gabès, Gafsa, Médenine…)</option>
+              </optgroup>
+              <optgroup label="▸ Individual Cities" id="citiesOG"></optgroup>
+            </select>
+          </div>
+          <div class="frow2">
+            <div>
+              <label class="lbl">Scope</label>
+              <select id="acceptOther">
+                <option value="Yes">Include whole region</option>
+                <option value="No">Strict city only</option>
+              </select>
+            </div>
+            <div>
+              <label class="lbl">Climate Risk Max</label>
+              <select id="climRisk">
+                <option value="Any">Any</option>
+                <option value="Low">Low only</option>
+                <option value="Moderate">Up to Moderate</option>
+                <option value="High">Up to High</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="fsec">
+          <div class="fsec-title">📐 Size</div>
+          <div class="frow2">
+            <div><label class="lbl">Min Area m²</label><input type="number" id="amin" placeholder="0"></div>
+            <div><label class="lbl">Max Area m²</label><input type="number" id="amax" placeholder="500"></div>
+          </div>
+          <div class="frow2">
+            <div><label class="lbl">Min Rooms</label><input type="number" id="rmin" placeholder="0" min="0"></div>
+            <div><label class="lbl">Max Rooms</label><input type="number" id="rmax" placeholder="10" min="0"></div>
+          </div>
+        </div>
+
+        <div class="fsec">
+          <div class="fsec-title">✨ Must-Have Amenities</div>
+          <div style="display:flex;flex-wrap:wrap;gap:.4rem" id="amenRow">
+            <button class="tbtn" data-am="parking">🚗 Parking</button>
+            <button class="tbtn" data-am="elevator">🛗 Lift</button>
+            <button class="tbtn" data-am="pool">🏊 Pool</button>
+            <button class="tbtn" data-am="garden">🌿 Garden</button>
+            <button class="tbtn" data-am="security">🔒 Security</button>
+            <button class="tbtn" data-am="fiber">📶 Fiber</button>
+          </div>
+        </div>
+
+        <div class="fsec">
+          <div class="fsec-title">🎛 Options</div>
+          </div>
+          <button class="search-btn" id="searchBtn" onclick="runSearch()">Find My Perfect Property →</button>
+        </div>
+      </aside>
+
+      <div class="mresults" id="mResults">
+        <div class="placeholder">
+          <div style="font-size:3.5rem;opacity:.3">🏛</div>
+          <h2>Find your perfect match</h2>
+          <p>Set preferences and search. The engine filters 5,800+ real Tunisian listings using a 4-stage AI pipeline.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.75rem;justify-content:center">
+            <span class="pbadge" style="background:#e6f0e8;color:#2d7a3e">① Hard Filter</span>
+            <span class="pbadge" style="background:#fef3e0;color:#c47a18">② Weighted Score</span>
+            <span class="pbadge" style="background:#e6eff8;color:#205a8b">③ CBF Cosine</span>
+            <span class="pbadge" style="background:#f0e6f8;color:#6d3fa0">④ Climate Match</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INSIGHTS TAB -->
+  <div id="mTabInsights" style="display:none">
+    <div class="insights-wrap">
+      <div class="kpi-grid" id="iKpis">
+        <div class="kpi"><div class="kpi-lbl">Total Listings</div><div class="kpi-val" id="iTotal">—</div><div class="kpi-sub">Real scraped data</div></div>
+        <div class="kpi"><div class="kpi-lbl">Average Price</div><div class="kpi-val" id="iAvg">—</div><div class="kpi-sub">TND</div></div>
+        <div class="kpi"><div class="kpi-lbl">Median Price</div><div class="kpi-val" id="iMed">—</div><div class="kpi-sub">TND</div></div>
+        
+      </div>
+      <div class="chart-grid" id="iCharts">
+        <div class="chart-card"><div class="chart-title">🏠 By Type</div><div class="chart-box"><canvas id="cType"></canvas></div></div>
+        <div class="chart-card"><div class="chart-title">💰 Price Distribution</div><div class="chart-box"><canvas id="cPrice"></canvas></div></div>
+        <div class="chart-card"><div class="chart-title">🌡 Climate Risk</div><div class="chart-box"><canvas id="cRisk"></canvas></div></div>
+        <div class="chart-card two"><div class="chart-title">📍 Avg Price by City (Top 12)</div><div class="chart-box tall"><canvas id="cCity"></canvas></div></div>
+        <div class="chart-card"><div class="chart-title">📦 By Source</div><div class="chart-box"><canvas id="cSource"></canvas></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ CLIMATN ═══════════════════════════ -->
+<div id="appClima" style="display:none">
+  <header class="hdr">
+    <div class="hdr-logo">Clima<em>TN</em></div>
+    <div class="hdr-right">
+      <div class="hdr-stat">24 Cities Monitored</div>
+      <div id="apiBadge" class="api-badge sim">● Simulated</div>
+    </div>
+  </header>
+  <div class="tabs">
+    <button class="tab on" data-ctab="city" onclick="switchCTab(this,'city')">🌡 City Analysis</button>
+    <button class="tab" data-ctab="compare" onclick="switchCTab(this,'compare')">⚖ Compare Cities</button>
+    <button class="tab" data-ctab="heatmap" onclick="switchCTab(this,'heatmap')">🗺 Regional Heatmap</button>
+    <button class="tab" data-ctab="cdash" onclick="switchCTab(this,'cdash')">📊 Dashboard</button>
+  </div>
+
+  <!-- CITY TAB -->
+  <div id="cTabCity" style="display:grid;grid-template-columns:255px 1fr;min-height:calc(100vh - 100px)">
+    <aside class="csidebar">
+      <div class="csidebar-label" id="cityCount">24 Cities</div>
+      <div class="city-list" id="cityList"></div>
+    </aside>
+    <div style="overflow-y:auto;max-height:calc(100vh - 100px)" id="cityMain">
+      <div class="placeholder"><div style="font-size:3rem;opacity:.35">🌡</div>
+        <h2>Select a city</h2>
+        <p>Pick any Tunisian city from the sidebar for live weather, risk indices and sustainability score.</p>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- REGIONAL HEATMAP TAB -->
+  <div id="cTabHeatmap" style="display:none;overflow-y:auto;max-height:calc(100vh - 100px)">
+    <div style="padding:1.2rem 1.8rem">
+
+      <!-- Header -->
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.8rem">
+        <div>
+          <div style="font-family:var(--serif);font-size:1.25rem;color:var(--ink)">Regional Risk Heatmap</div>
+          <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-top:.25rem">
+            Interactive map · colour intensity = risk level · click any city for full analysis
+          </div>
+        </div>
+        <div style="display:flex;gap:.6rem;align-items:center">
+          <div id="hmTimestamp" style="font-family:var(--mono);font-size:.6rem;color:var(--muted)"></div>
+          <button onclick="loadHeatmap()" style="font-family:var(--mono);font-size:.65rem;background:var(--orange);color:#fff;padding:.45rem .9rem;border:none;border-radius:5px;cursor:pointer;letter-spacing:.04em">↻ Refresh</button>
+        </div>
+      </div>
+
+      <!-- Methodology banner -->
+      <div style="background:linear-gradient(135deg,#1c1612,#2a2018);color:#f5ede0;border-radius:var(--r);padding:.85rem 1.4rem;margin-bottom:1.2rem;display:flex;gap:2rem;flex-wrap:wrap;align-items:center">
+        <div><div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:#8b7560;margin-bottom:.25rem">Formula</div><div style="font-family:var(--mono);font-size:.75rem">Combined = <span style="color:#f09050">Historical × 0.70</span> + <span style="color:#7cb8f0">Live Weather × 0.30</span></div></div>
+        <div><div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:#8b7560;margin-bottom:.25rem">Map Legend</div>
+          <div style="display:flex;gap:.5rem;align-items:center;font-family:var(--mono);font-size:.62rem">
+            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#2d7a3e"></span>Low
+            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#c47a18"></span>Moderate
+            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#c85020"></span>High
+            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#9e1e1e"></span>Very High
+          </div>
+        </div>
+        <div><div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:#8b7560;margin-bottom:.25rem">Source</div><div style="font-size:.78rem">Open-Meteo API + World Bank Tunisia 2025</div></div>
+      </div>
+
+      <!-- MAP (full width, prominent) -->
+      <div id="tunisiaMap" style="margin-bottom:1.2rem"></div>
+
+      <!-- Region cards grid -->
+      <div id="hmRegionGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.8rem;margin-bottom:1.2rem">
+        <div class="loading"><div class="spin-el"></div>Loading heatmap data…</div>
+      </div>
+
+      <!-- Full city table -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)">
+        <div style="background:var(--ink);padding:.8rem 1.2rem">
+          <div style="font-family:var(--serif);font-size:.95rem;color:#f5ede0">All 24 Cities — Detailed Risk Table</div>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:.82rem" id="hmCityTable">
+            <thead><tr style="background:var(--warm)">
+              <th style="font-family:var(--mono);font-size:.57rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:.5rem .8rem;text-align:left;border-bottom:2px solid var(--border)">City</th>
+              <th style="font-family:var(--mono);font-size:.57rem;text-transform:uppercase;color:var(--muted);padding:.5rem .8rem;border-bottom:2px solid var(--border)">Region</th>
+              <th style="font-family:var(--mono);font-size:.57rem;text-transform:uppercase;color:var(--muted);padding:.5rem .8rem;text-align:center;border-bottom:2px solid var(--border)">Live Temp</th>
+              <th style="font-family:var(--mono);font-size:.57rem;text-transform:uppercase;color:var(--muted);padding:.5rem .8rem;text-align:center;border-bottom:2px solid var(--border)">Live Rain</th>
+              <th style="font-family:var(--mono);font-size:.57rem;text-transform:uppercase;color:var(--muted);padding:.5rem .8rem;border-bottom:2px solid var(--border)">Historical</th>
+              <th style="font-family:var(--mono);font-size:.57rem;text-transform:uppercase;color:var(--muted);padding:.5rem .8rem;border-bottom:2px solid var(--border)">Combined Risk</th>
+              <th style="font-family:var(--mono);font-size:.57rem;text-transform:uppercase;color:var(--muted);padding:.5rem .8rem;text-align:center;border-bottom:2px solid var(--border)">Sustainability</th>
+            </tr></thead>
+            <tbody id="hmTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- COMPARE TAB -->
+  <div id="cTabCompare" style="display:none">
+    <div style="padding:1.5rem 2rem;overflow-y:auto;max-height:calc(100vh - 100px)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.3rem">
+        <div>
+          <div style="font-family:var(--serif);font-size:1.2rem">City Comparison</div>
+          <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-top:.2rem">Live weather + risk + sustainability — 16 cities</div>
+        </div>
+        <button onclick="loadCompare()" style="font-family:var(--mono);font-size:.65rem;background:var(--orange);color:#fff;padding:.45rem .9rem;border:none;border-radius:5px;cursor:pointer">↻ Refresh</button>
+      </div>
+      <div class="cmp-chart-box"><canvas id="compareChart"></canvas></div>
+      <table class="cmp-table">
+        <thead><tr><th>City</th><th>Region</th><th>Temp</th><th>Humidity</th><th>Flood</th><th>Heat</th><th>Drought</th><th>Risk Score</th><th>Sustainability</th></tr></thead>
+        <tbody id="compareBody"><tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted);font-family:var(--mono);font-size:.7rem">Click Refresh to load</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- DASHBOARD TAB -->
+  <div id="cTabCdash" style="display:none">
+    <div class="insights-wrap">
+      <div class="cdash-kpis">
+        <div class="kpi"><div class="kpi-lbl">Cities Monitored</div><div class="kpi-val" style="color:var(--blue)">24</div><div class="kpi-sub">Across Tunisia</div></div>
+        <div class="kpi"><div class="kpi-lbl">Avg Risk Score</div><div class="kpi-val" id="cdKpi2">—</div><div class="kpi-sub">0–10 scale</div></div>
+        <div class="kpi"><div class="kpi-lbl">Safest City</div><div class="kpi-val" style="font-size:1.1rem" id="cdKpi3">—</div><div class="kpi-sub">Lowest risk</div></div>
+        <div class="kpi"><div class="kpi-lbl">Most Sustainable</div><div class="kpi-val" style="font-size:1.1rem" id="cdKpi4">—</div><div class="kpi-sub">Grade A city</div></div>
+      </div>
+      <div class="cdash-charts">
+        <div class="cdash-chart-card"><div class="cdash-chart-title">📊 Overall Risk Score by City</div><div class="cdash-chart-box" style="height:260px"><canvas id="cdRisk"></canvas></div></div>
+        <div class="cdash-chart-card"><div class="cdash-chart-title">🌱 Sustainability Score by City</div><div class="cdash-chart-box" style="height:260px"><canvas id="cdSust"></canvas></div></div>
+        <div class="cdash-chart-card full">
+          <div class="cdash-chart-title">📋 Complete Risk Profile — All 24 Cities</div>
+          <table class="city-risk-table" id="cdTable">
+            <thead><tr><th>City</th><th>Region</th><th>Coastal</th><th>Flood</th><th>Heat</th><th>Earthquake</th><th>Drought</th><th>Risk Score</th><th>Sust. Score</th><th>Grade</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PROPERTY MODAL -->
+<div class="modal-bg" id="propModal" onclick="if(event.target===this)closeMod('propModal')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div><div class="modal-title" id="modTitle">—</div><div class="modal-sub" id="modSub">—</div></div>
+      <div style="display:flex;gap:.5rem;align-items:center">
+        <button onclick="addToCompare(currentProp)" style="font-family:var(--mono);font-size:.62rem;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#f5ede0;padding:.3rem .65rem;border-radius:4px;cursor:pointer">⊕ Compare</button>
+        <button class="modal-close" onclick="closeMod('propModal')">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="modBody"></div>
+  </div>
+</div>
+
+<!-- COMPARE MODAL -->
+<div class="modal-bg" id="compareModal" onclick="if(event.target===this)closeMod('compareModal')">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-hdr">
+      <div><div class="modal-title">Property Comparison</div><div class="modal-sub" id="cmpSub">—</div></div>
+      <button class="modal-close" onclick="closeMod('compareModal')">✕</button>
+    </div>
+    <div class="cmp-modal-body" id="cmpBody"></div>
+  </div>
+</div>
+
+<!-- COMPARE PANEL -->
+<div class="compare-panel" id="comparePanel">
+  <div class="compare-panel-title">⊕ Compare Properties</div>
+  <div id="compareList"></div>
+  <button class="compare-btn" onclick="openCompareModal()">Compare Now →</button>
+  <button class="compare-btn" onclick="clearCompare()" style="background:transparent;border:1px solid #444;margin-top:.3rem">Clear</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// GLOBALS
+// ═══════════════════════════════════════
+const RC = {Low:'#2d7a3e',Medium:'#c47a18',Moderate:'#c47a18',High:'#c85020','Very High':'#9e1e1e',
+  Safe:'#2d7a3e',Caution:'#c47a18',Danger:'#c85020',Extreme:'#9e1e1e',Critical:'#7a0e0e',
+  'Extreme Drought':'#9e1e1e','Moderate Drought':'#c85020','Mildly Dry':'#c47a18',
+  Normal:'#2d7a3e',Wet:'#205a8b'};
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+let insightsLoaded=false, cdashLoaded=false, cmpChartInst=null;
+let compareProps=[], currentProp=null;
+let matchStats=null;
+
+function chip(val){
+  const c=RC[val]||'#8c7e70';
+  return `<span class="rchip" style="background:${c}18;color:${c};border:1px solid ${c}33">${val}</span>`;
+}
+
+// ═══════════════════════════════════════
+// APP SWITCHING
+// ═══════════════════════════════════════
+function switchApp(app){
+  document.getElementById('appMatch').style.display = app==='match'?'':'none';
+  document.getElementById('appClima').style.display = app==='clima'?'':'none';
+  document.getElementById('swMatch').classList.toggle('active',app==='match');
+  document.getElementById('swClima').classList.toggle('active',app==='clima');
+  if(app==='clima' && !document.querySelector('.city-btn')) initClima();
+}
+document.addEventListener('DOMContentLoaded', function(){
+  switchApp('match');
+  initMatch();
+});
+
+// ═══════════════════════════════════════
+// MATCHDAR
+// ═══════════════════════════════════════
+function switchMTab(btn,tab){
+  document.querySelectorAll('[data-mtab]').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('mTabSearch').style.display   = tab==='search'  ?'':'none';
+  document.getElementById('mTabInsights').style.display = tab==='insights'?'':'none';
+  if(tab==='insights') loadInsights();
+}
+
+// Property type toggle
+document.querySelectorAll('#ptypeRow .tbtn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#ptypeRow .tbtn').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); onLocChange();
+}));
+document.querySelectorAll('#amenRow .tbtn').forEach(b=>b.addEventListener('click',()=>b.classList.toggle('on')));
+
+// Load config
+async function initMatch(){
+  const cfg = await fetch('/api/match/config').then(r=>r.json());
+  const og = document.getElementById('citiesOG');
+  cfg.cities.slice(0,60).forEach(c=>{
+    const o=document.createElement('option');
+    o.value=c.city; o.textContent=`${c.city} (${c.count})`;
+    og.appendChild(o);
+  });
+  matchStats = await fetch('/api/match/stats').then(r=>r.json());
+  document.getElementById('mTotal').textContent = matchStats.total?.toLocaleString();
+  document.getElementById('mAvg').textContent   = matchStats.price_stats?.mean?.toLocaleString();
+}
+// initMatch called on DOM ready (see bottom of script)
+
+async function onLocChange(){
+  const city=document.getElementById('citySelect').value;
+  const ptype=document.querySelector('#ptypeRow .tbtn.on')?.dataset.v||'Any';
+  if(city==='Any'&&ptype==='Any'){document.getElementById('priceHint').classList.remove('show');return}
+  const d=await fetch(`/api/match/price_hint?city=${encodeURIComponent(city)}&type=${encodeURIComponent(ptype)}`).then(r=>r.json());
+  if(d.count>0){
+    document.getElementById('phText').textContent=`${d.count} listings · ${d.min.toLocaleString()}–${d.max.toLocaleString()} TND (median ${d.median.toLocaleString()})`;
+    document.getElementById('priceHint').classList.add('show');
+  }
+}
+
+function getAm(k){return document.querySelector(`#amenRow [data-am="${k}"]`)?.classList.contains('on')?'Yes':'No'}
+
+function buildPayload(){
+  return{
+    preferred_property_type:document.querySelector('#ptypeRow .tbtn.on')?.dataset.v||'Any',
+    budget_min_tnd:parseFloat(document.getElementById('bmin').value)||0,
+    budget_max_tnd:parseFloat(document.getElementById('bmax').value)||9999999,
+    preferred_city:document.getElementById('citySelect').value,
+    accept_other_cities:document.getElementById('acceptOther').value,
+    acceptable_climate_risk:document.getElementById('climRisk').value,
+    min_area_sqm:parseFloat(document.getElementById('amin').value)||0,
+    max_area_sqm:parseFloat(document.getElementById('amax').value)||0,
+    min_rooms:parseFloat(document.getElementById('rmin').value)||0,
+    max_rooms:parseFloat(document.getElementById('rmax').value)||0,
+    needs_parking:getAm('parking'), needs_elevator:getAm('elevator'),
+    needs_pool:getAm('pool'),       needs_garden:getAm('garden'),
+    needs_security:getAm('security'), needs_fiber:getAm('fiber'),
+  };
+}
+
+async function runSearch(){
+  const btn=document.getElementById('searchBtn');
+  btn.disabled=true; btn.textContent='Searching…';
+  document.getElementById('mResults').innerHTML='<div class="loading"><div class="spin-el"></div>Running 4-stage recommendation engine…</div>';
+  try{
+    const data=await fetch('/api/match/recommend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(buildPayload())}).then(r=>r.json());
+    renderResults(data);
+  }catch(e){document.getElementById('mResults').innerHTML='<div class="loading">Error — is the server running?</div>';}
+  btn.disabled=false; btn.textContent='Find My Perfect Property →';
+}
+
+function renderResults(data){
+  const panel=document.getElementById('mResults');
+  const recs=data.recommendations||[];
+  if(!recs.length){
+    panel.innerHTML=`
+      <div class="res-hdr"><div><div class="res-hdr-title">No matches found</div>
+      <div class="res-hdr-meta">${data.n_filtered} listings passed filter</div></div></div>
+      <div class="placeholder" style="height:50vh">
+        <div style="font-size:2.5rem;opacity:.4">🔍</div><h2>No properties matched</h2>
+        <p>Try widening budget, relaxing city constraint, or changing climate risk filter.</p>
+      </div>`;
+    return;
+  }
+  panel.innerHTML=`
+    <div class="res-hdr">
+      <div><div class="res-hdr-title">${recs.length} properties matched</div>
+      <div class="res-hdr-meta">${data.n_filtered} of ${data.total?.toLocaleString()} passed filter · Best: ${data.top_score?.toFixed(1)}/100</div></div>
+      <div style="display:flex;gap:.35rem">
+        <span class="pbadge" style="background:#e6f0e8;color:#2d7a3e">① ${data.n_filtered}</span>
+        <span class="pbadge" style="background:#fef3e0;color:#c47a18">② scored</span>
+        <span class="pbadge" style="background:#e6eff8;color:#205a8b">③ ${recs.length}</span>
+      </div>
+    </div>
+    <div class="cards-grid">${recs.map((p,i)=>propCard(p,i)).join('')}</div>`;
+}
+
+function propCard(p,i){
+  const rc=RC[p.climate_risk_category]||'#8c7e70';
+  const ms=p.match_score||0, cs=p.cbf_similarity||0, fs=p.final_score||0;
+  const tags=[];
+  if(p.has_parking==1)  tags.push('<span class="tag g">🚗 Parking</span>');
+  if(p.has_pool==1)     tags.push('<span class="tag b">🏊 Pool</span>');
+  if(p.has_garden==1)   tags.push('<span class="tag g">🌿 Garden</span>');
+  if(p.has_elevator==1) tags.push('<span class="tag">🛗 Lift</span>');
+  if(p.has_security==1) tags.push('<span class="tag">🔒 Security</span>');
+  if(p.has_sea_view==1) tags.push('<span class="tag p">🌊 Sea View</span>');
+  if(p.furnished==1)    tags.push('<span class="tag g">🛋 Furnished</span>');
+  const imgHtml = p.primary_image
+    ? `<img class="pcard-img" src="${p.primary_image}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="pcard-no-img" style="display:none">🏠</div>`
+    : `<div class="pcard-no-img">🏠</div>`;
+  return `<div class="pcard" onclick="openProp('${p.listing_id}')" style="animation-delay:${i*.035}s">
+    ${imgHtml}
+    <div class="pcard-head">
+      <div class="pcard-rank">${i+1}</div>
+      <div class="pcard-type">${p.property_type||'—'}</div>
+      <div class="pcard-city">${p.city}</div>
+      <div class="pcard-neigh">${p.neighborhood||p.governorate||''}</div>
+      <div class="score-pill">${fs}%</div>
+    </div>
+    <div class="pcard-body">
+      <div class="pcard-price">${Number(p.price_tnd).toLocaleString()} TND</div>
+      <div class="pcard-specs">
+        ${p.surface_m2>0?`<span>📐 ${p.surface_m2}m²</span>`:''}
+        ${p.rooms>0?`<span>🛏 ${p.rooms}R</span>`:''}
+        <span class="risk-chip" style="background:${rc}18;color:${rc};border:1px solid ${rc}33">🌡 ${p.climate_risk_category||'—'}</span>
+      </div>
+      <div class="pcard-tags">${tags.slice(0,5).join('')}</div>
+    </div>
+    <div class="score-bars">
+      <div class="sbar"><div class="sbar-val">${ms}</div><div class="sbar-track"><div class="sbar-fill" style="width:${ms}%;background:#c85020"></div></div><div class="sbar-lbl">Weighted</div></div>
+      <div class="sbar"><div class="sbar-val">${cs}</div><div class="sbar-track"><div class="sbar-fill" style="width:${cs}%;background:#205a8b"></div></div><div class="sbar-lbl">CBF</div></div>
+      <div class="sbar"><div class="sbar-val" style="color:var(--orange)">${fs}</div><div class="sbar-track"><div class="sbar-fill" style="width:${fs}%;background:var(--orange)"></div></div><div class="sbar-lbl">Final</div></div>
+    </div>
+  </div>`;
+}
+
+
+
+async function openProp(id){
+  document.getElementById('propModal').classList.add('open');
+  document.getElementById('modBody').innerHTML='<div class="loading"><div class="spin-el"></div>Loading…</div>';
+  const data=await fetch(`/api/match/listing/${id}`).then(r=>r.json());
+  const p=data.property; currentProp=p;
+  document.getElementById('modTitle').textContent=`${p.city}${p.neighborhood?' — '+p.neighborhood:''}`;
+  document.getElementById('modSub').textContent=`${p.property_type} · ${p.climate_risk_category} Climate Risk`;
+  const gallery='';
+  const dets=[
+    {l:'Price (TND)',v:Number(p.price_tnd).toLocaleString()},
+    {l:'Surface',v:p.surface_m2>0?`${p.surface_m2}m²`:'—'},
+    {l:'Rooms',v:p.rooms||'—'},{l:'Bedrooms',v:p.bedrooms||'—'},
+    {l:'City',v:p.city},{l:'Governorate',v:p.governorate||'—'},
+    {l:'Climate Risk',v:p.climate_risk_category||'—'},
+    {l:'Flood / Heat',v:`${p.flood_risk||'—'} / ${p.heat_risk||'—'}`},
+  ];
+  const simCards=(data.similar||[]).slice(0,6).map(s=>`
+    <div class="sim-card" onclick="closeMod('propModal');setTimeout(()=>openProp('${s.listing_id}'),180)">
+      <div style="font-weight:600;font-size:.82rem">${s.city}</div>
+      <div style="font-family:var(--mono);font-size:.72rem;color:var(--orange);margin-top:.15rem">${Number(s.price_tnd).toLocaleString()} TND</div>
+      <div style="font-size:.68rem;color:var(--muted);margin-top:.1rem">${s.property_type}${s.surface_m2>0?' · '+s.surface_m2+'m²':''}</div>
+      <div style="margin-top:.3rem">${chip(s.climate_risk_category||'Moderate')}</div>
+    </div>`).join('');
+  const aff=p.affordability_score?`<div style="font-family:var(--mono);font-size:.7rem;color:var(--muted);margin-top:.6rem">Affordability index: <strong style="color:var(--orange)">${p.affordability_score}/100</strong> vs city average</div>`:'';
+  document.getElementById('modBody').innerHTML=`
+    ${gallery}
+    <div class="modal-price">${Number(p.price_tnd).toLocaleString()} TND</div>
+    <div class="detail-grid">${dets.map(d=>`<div class="di"><div class="di-lbl">${d.l}</div><div class="di-val">${d.v}</div></div>`).join('')}</div>
+    ${aff}
+    <div class="sim-title" style="margin-top:1rem">🔗 Similar Properties (KNN Nearest Neighbours)</div>
+    <div class="sim-grid">${simCards||'<div style="color:var(--muted);font-size:.78rem">None found</div>'}</div>`;
+}
+
+// ── COMPARE FEATURE ──
+function addToCompare(p){
+  if(!p) return;
+  if(compareProps.find(x=>x.listing_id===p.listing_id)) return;
+  if(compareProps.length>=4){alert('Max 4 properties'); return;}
+  compareProps.push(p);
+  renderComparePanel();
+}
+
+function renderComparePanel(){
+  const panel=document.getElementById('comparePanel');
+  if(compareProps.length===0){panel.classList.remove('show');return;}
+  panel.classList.add('show');
+  document.getElementById('compareList').innerHTML=compareProps.map((p,i)=>`
+    <div class="compare-item">
+      <span>${p.city} · ${Number(p.price_tnd).toLocaleString()} TND</span>
+      <span class="compare-remove" onclick="removeCompare(${i})">✕</span>
+    </div>`).join('');
+}
+
+function removeCompare(i){compareProps.splice(i,1); renderComparePanel();}
+function clearCompare(){compareProps=[]; renderComparePanel();}
+
+function openCompareModal(){
+  if(compareProps.length<2){alert('Add at least 2 properties'); return;}
+  closeMod('propModal');
+  document.getElementById('compareModal').classList.add('open');
+  document.getElementById('cmpSub').textContent=`Comparing ${compareProps.length} properties`;
+  const fields=['price_tnd','surface_m2','rooms','climate_risk_category','climate_score','affordability_score',
+                'has_parking','has_pool','has_garden','has_elevator','has_security'];
+  const labels={'price_tnd':'Price (TND)','surface_m2':'Surface m²','rooms':'Rooms',
+                'climate_risk_category':'Climate Risk','climate_score':'Climate Score',
+                'affordability_score':'Affordability','has_parking':'Parking','has_pool':'Pool',
+                'has_garden':'Garden','has_elevator':'Lift','has_security':'Security'};
+  const numeric=['price_tnd','surface_m2','rooms','climate_score','affordability_score'];
+  const rows=fields.map(f=>{
+    const vals=compareProps.map(p=>p[f]);
+    let best=null;
+    if(numeric.includes(f)){
+      const nums=vals.map(v=>parseFloat(v)||0);
+      if(f==='climate_score'||f==='price_tnd') best=nums.indexOf(Math.min(...nums));
+      else best=nums.indexOf(Math.max(...nums));
+    }
+    return `<tr><td style="font-family:var(--mono);font-size:.65rem;color:var(--muted);font-weight:500">${labels[f]||f}</td>${
+      vals.map((v,i)=>{
+        const isWin=best===i;
+        const display=f==='price_tnd'?Number(v||0).toLocaleString():
+                      f.startsWith('has_')?(v==1?'✅':'—'):
+                      f==='climate_risk_category'?chip(v||'—'):(v||'—');
+        return `<td class="${isWin?'win-cell':''}">${display}${isWin?' 🏆':''}</td>`;
+      }).join('')
+    }</tr>`;
+  }).join('');
+  document.getElementById('cmpBody').innerHTML=`
+    <table class="cmp-tbl">
+      <thead><tr><th>Feature</th>${compareProps.map(p=>`<th>${p.city}<br><span style="color:var(--orange);font-size:.7rem">${Number(p.price_tnd).toLocaleString()} TND</span></th>`).join('')}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// INSIGHTS
+async function loadInsights(){
+  if(insightsLoaded) return; insightsLoaded=true;
+  const d=matchStats||await fetch('/api/match/stats').then(r=>r.json());
+  document.getElementById('iTotal').textContent  = d.total?.toLocaleString();
+  document.getElementById('iAvg').textContent    = d.price_stats?.mean?.toLocaleString();
+  document.getElementById('iMed').textContent    = d.price_stats?.median?.toLocaleString();
+  const PAL=['#d4540a','#c47a18','#2d7a3e','#205a8b','#7c3aed','#c85020','#1a7a6a'];
+  const dOpts={responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{family:'JetBrains Mono',size:10},color:'#3a3028',padding:8}}}};
+  const bOpts={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{family:'JetBrains Mono',size:9},color:'#8c7e70'},grid:{color:'#e2d8cc'}},y:{ticks:{font:{family:'JetBrains Mono',size:9},color:'#8c7e70'},grid:{color:'#e2d8cc'}}}};
+  new Chart(document.getElementById('cType'),  {type:'doughnut',data:{labels:Object.keys(d.by_type||{}),datasets:[{data:Object.values(d.by_type||{}),backgroundColor:PAL}]},options:dOpts});
+  new Chart(document.getElementById('cPrice'), {type:'bar',data:{labels:d.price_distribution?.labels,datasets:[{data:d.price_distribution?.values,backgroundColor:PAL,borderRadius:4}]},options:bOpts});
+  const riskPAL=Object.keys(d.by_risk||{}).map(k=>RC[k]||'#8c7e70');
+  new Chart(document.getElementById('cRisk'),  {type:'doughnut',data:{labels:Object.keys(d.by_risk||{}),datasets:[{data:Object.values(d.by_risk||{}),backgroundColor:riskPAL}]},options:dOpts});
+  new Chart(document.getElementById('cSource'),{type:'doughnut',data:{labels:Object.keys(d.by_source||{}),datasets:[{data:Object.values(d.by_source||{}),backgroundColor:PAL}]},options:dOpts});
+  const tc=(d.top_cities||[]).slice(0,12);
+  new Chart(document.getElementById('cCity'),{
+    type:'bar',
+    data:{
+      labels:tc.map(c=>c.city),
+      datasets:[{
+        label:'Avg Price (K TND)',
+        data:tc.map(c=>Math.round((c.mean_price||0)/1000)),
+        backgroundColor:'rgba(212,84,10,.75)',
+        borderColor:'#d4540a',
+        borderWidth:1,
+        borderRadius:4
+      }]
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{
+          ticks:{
+            font:{family:'JetBrains Mono',size:9},
+            color:'#8c7e70',
+            callback: v => v+'K'
+          },
+          grid:{color:'#e2d8cc'},
+          title:{display:true,text:'Avg Price (K TND)',font:{family:'JetBrains Mono',size:9},color:'#8c7e70'}
+        },
+        y:{
+          ticks:{font:{family:'JetBrains Mono',size:9},color:'#8c7e70'},
+          grid:{color:'#e2d8cc'}
+        }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════
+// CLIMATN
+// ═══════════════════════════════════════
+function switchCTab(btn,tab){
+  document.querySelectorAll('[data-ctab]').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  ['cTabCity','cTabCompare','cTabHeatmap','cTabCdash'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  if(tab==='city')    document.getElementById('cTabCity').style.display='grid';
+  if(tab==='compare'){document.getElementById('cTabCompare').style.display='';loadCompare();}
+  if(tab==='heatmap'){document.getElementById('cTabHeatmap').style.display='';setTimeout(()=>{if(!leafletMap)initLeafletMap();if(!hmLoaded){hmLoaded=true;loadHeatmap();}},50);}
+  if(tab==='cdash')  {document.getElementById('cTabCdash').style.display='';loadCDash();}
+}
+
+async function initClima(){
+  const cities=await fetch('/api/climate/cities').then(r=>r.json());
+  document.getElementById('cityCount').textContent=`${cities.length} Cities`;
+  const list=document.getElementById('cityList');
+  const GAUGE_PCT={Low:10,Medium:35,Moderate:35,High:72,'Very High':100};
+  cities.forEach(c=>{
+    const btn=document.createElement('button');
+    btn.className='city-btn'; btn.dataset.city=c.city;
+    btn.innerHTML=`<span class="risk-dot" style="background:${c.risk_color}"></span>${c.city}<span class="city-region">${c.region.split('-')[0]}</span>`;
+    btn.onclick=()=>selectCity(c.city);
+    list.appendChild(btn);
+  });
+  selectCity('Tunis');
+}
+
+async function selectCity(city){
+  document.querySelectorAll('.city-btn').forEach(b=>b.classList.toggle('on',b.dataset.city===city));
+  const main=document.getElementById('cityMain');
+  main.innerHTML='<div class="loading"><div class="spin-el"></div>Fetching from Open-Meteo…</div>';
+  try{
+    const d=await fetch(`/api/climate/weather/${encodeURIComponent(city)}`).then(r=>r.json());
+    renderCity(d);
+  }catch(e){
+    main.innerHTML='<div class="loading">Error loading city data.</div>';
+  }
+}
+
+function renderCity(d){
+  const live=d.source==='live';
+  document.getElementById('apiBadge').textContent=live?'● Live API':'● Simulated';
+  document.getElementById('apiBadge').className=`api-badge ${live?'live':'sim'}`;
+  const w=d.weather.current, r=d.risks, fi=d.flood_index, hi=d.heat_index, spi=d.drought_spi;
+  const cv=d.climate_vars||{};
+  const GPCT={Low:10,Medium:35,Moderate:35,High:72,'Very High':100};
+  const gauges=[
+    {label:'Flood',key:'flood',color:'#3b82f6'},
+    {label:'Heat',key:'heat',color:'#d4540a'},
+    {label:'Seismic',key:'earthquake',color:'#7c3aed'},
+    {label:'Drought',key:'drought',color:'#c47a18'},
+  ].map(g=>`<div class="gauge-item">
+    <span class="g-name">${g.label}</span>
+    <div class="g-track"><div class="g-fill" style="width:${GPCT[r[g.key]]||10}%;background:${g.color}"></div></div>
+    <span class="g-level" style="color:${RC[r[g.key]]||'#8c7e70'}">${r[g.key]}</span>
+  </div>`).join('');
+  const fcHTML=(d.weather.forecast_7d||[]).map((f,i)=>{
+    const name=i===0?'Today':DAYS[new Date(f.date).getDay()];
+    const uvColor=f.uv>=8?'#9e1e1e':f.uv>=5?'#c85020':f.uv>=3?'#c47a18':'#2d7a3e';
+    return `<div class="fc-day">
+      <div class="fc-name">${name}</div>
+      <div class="fc-hi">${f.temp_max}°</div>
+      <div class="fc-lo">${f.temp_min}°</div>
+      <div class="fc-rain">💧${f.precip}mm</div>
+      <div class="fc-uv" style="color:${uvColor}">UV${f.uv||'—'}</div>
+    </div>`;
+  }).join('');
+  const sColor=d.sustainability_score>=75?'#2d7a3e':d.sustainability_score>=60?'#c47a18':'#c85020';
+  const propCount=document.querySelectorAll(`[data-city="${d.city}"]`).length;
+
+  document.getElementById('cityMain').innerHTML=`
+    <div class="chero">
+      <div>
+        <div class="chero-name">${d.city}</div>
+        <div class="chero-meta">${d.lat}°N · ${d.lon}°E · ${d.region}</div>
+        <div class="chero-badges">
+          ${chip(d.risk_category)}
+          <span style="font-family:var(--mono);font-size:.65rem;color:var(--muted)">risk ${d.risk_score}/10</span>
+          <span class="rchip" style="background:${sColor}18;color:${sColor};border:1px solid ${sColor}33">🌱 ${d.sustainability_score}/100 (${d.sustainability_grade})</span>
+          ${cv.rain_mm?`<span style="font-family:var(--mono);font-size:.6rem;color:var(--blue)">💧${cv.rain_mm}mm/yr</span>`:''}
+          ${cv.hot_days?`<span style="font-family:var(--mono);font-size:.6rem;color:var(--high)">☀️${cv.hot_days}d>35°C</span>`:''}
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="chero-temp">${w.temperature}°C</div>
+        <div class="chero-cond">${w.condition}</div>
+        <div class="chero-cond" style="font-size:.7rem;color:var(--muted);margin-top:.15rem">Feels ${w.feels_like}°C · ${w.humidity}% RH · ${w.wind_speed}km/h</div>
+        <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.3rem">${live?'📡 Open-Meteo Live':'🔄 Simulated (no internet)'}</div>
+      </div>
+    </div>
+
+    <div class="risk-strip">
+      <div class="rc flood"><div class="rc-lbl">🌊 Flood Risk</div><div class="rc-val" style="color:${RC[r.flood]||'#8c7e70'}">${r.flood}</div><div class="rc-sub">Precipitation exposure</div></div>
+      <div class="rc heat"><div class="rc-lbl">🔥 Heat Risk</div><div class="rc-val" style="color:${RC[r.heat]||'#8c7e70'}">${r.heat}</div><div class="rc-sub">Temperature stress</div></div>
+      <div class="rc quake"><div class="rc-lbl">🌍 Earthquake</div><div class="rc-val" style="color:${RC[r.earthquake]||'#8c7e70'}">${r.earthquake}</div><div class="rc-sub">Seismic activity</div></div>
+      <div class="rc drought"><div class="rc-lbl">☀️ Drought Risk</div><div class="rc-val" style="color:${RC[r.drought]||'#8c7e70'}">${r.drought}</div><div class="rc-sub">Water deficit</div></div>
+    </div>
+
+    <div class="cdash">
+      <div class="cpanel">
+        <div class="panel-title">Live Weather Conditions</div>
+        <div class="wx-grid">
+          <div class="wx-card"><div class="wx-icon">💧</div><div class="wx-val">${w.humidity}%</div><div class="wx-lbl">Humidity</div></div>
+          <div class="wx-card"><div class="wx-icon">💨</div><div class="wx-val">${w.wind_speed}km/h</div><div class="wx-lbl">Wind</div></div>
+          <div class="wx-card"><div class="wx-icon">🌡️</div><div class="wx-val">${w.feels_like}°C</div><div class="wx-lbl">Feels Like</div></div>
+          <div class="wx-card"><div class="wx-icon">🌧️</div><div class="wx-val">${w.precipitation}mm</div><div class="wx-lbl">Precipitation</div></div>
+        </div>
+      </div>
+
+      <div class="cpanel">
+        <div class="panel-title">Risk Profile & Sustainability</div>
+        <div class="gauge-list">${gauges}</div>
+        <div class="sust-bar-wrap">
+          <div class="sust-top">
+            <div>
+              <div class="sust-grade" style="color:${sColor}">${d.sustainability_grade}</div>
+              <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">Sustainability Grade</div>
+            </div>
+            <div class="sust-score">${d.sustainability_score}/100</div>
+          </div>
+          <div class="sust-track"><div class="sust-fill" style="width:${d.sustainability_score}%;background:${sColor}"></div></div>
+        </div>
+      </div>
+
+      <div class="cpanel">
+        <div class="panel-title">Computed Climate Indices</div>
+        <div class="idx-grid">
+          <div class="idx-card ic-flood">
+            <div class="idx-title">Flood Index</div>
+            <div class="idx-val" style="color:#3b82f6">${fi.index?.toFixed(2)}</div>
+            <div class="idx-level" style="color:${RC[fi.level]||'#8c7e70'}">${fi.level}</div>
+            <div class="idx-detail">Now: ${fi.precip}mm</div>
+          </div>
+          <div class="idx-card ic-heat">
+            <div class="idx-title">Heat Index</div>
+            <div class="idx-val" style="color:var(--orange)">${hi.value}°C</div>
+            <div class="idx-level" style="color:${RC[hi.level]||'#8c7e70'}">${hi.level}</div>
+            <div class="idx-detail">T${hi.temp}° · RH${hi.humidity}%</div>
+          </div>
+          <div class="idx-card ic-drought">
+            <div class="idx-title">Drought SPI</div>
+            <div class="idx-val" style="color:var(--mod)">${spi.spi?.toFixed(2)}</div>
+            <div class="idx-level" style="color:${RC[spi.level]||'#8c7e70'}">${spi.level}</div>
+            <div class="idx-detail">30d: ${spi.total_precip_mm}mm</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cpanel">
+        <div class="panel-title">7-Day Forecast</div>
+        <div class="fc-row">${fcHTML}</div>
+      </div>
+
+      <div class="cpanel cfull">
+        <div class="panel-title">30-Day Temperature & Precipitation History (ERA5)</div>
+        <div class="hist-wrap"><canvas id="histChart"></canvas></div>
+      </div>
+    </div>`;
+
+  // Destroy old chart if exists
+  if(window._histChart) window._histChart.destroy();
+  const dates=d.historical?.dates||[], tmax=d.historical?.tmax||[], tmin=d.historical?.tmin||[], precip=d.historical?.precip||[];
+  window._histChart=new Chart(document.getElementById('histChart').getContext('2d'),{
+    data:{labels:dates.map(x=>x.slice(5)),datasets:[
+      {type:'line',label:'Tmax °C',data:tmax,borderColor:'#c85020',backgroundColor:'rgba(200,80,32,.07)',tension:.4,fill:true,pointRadius:0,borderWidth:2,yAxisID:'y'},
+      {type:'line',label:'Tmin °C',data:tmin,borderColor:'#205a8b',backgroundColor:'rgba(32,90,139,.05)',tension:.4,fill:true,pointRadius:0,borderWidth:2,yAxisID:'y'},
+      {type:'bar',label:'Precip mm',data:precip,backgroundColor:'rgba(32,90,139,.2)',borderColor:'rgba(32,90,139,.4)',borderWidth:1,yAxisID:'y2'},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#8c7e70',font:{family:'JetBrains Mono',size:10},boxWidth:12}}},
+      scales:{x:{ticks:{color:'#8c7e70',font:{family:'JetBrains Mono',size:9},maxTicksLimit:10},grid:{color:'#e2d8cc'}},
+              y:{position:'left',ticks:{color:'#8c7e70',font:{family:'JetBrains Mono',size:9}},grid:{color:'#e2d8cc'}},
+              y2:{position:'right',ticks:{color:'#8c7e70',font:{family:'JetBrains Mono',size:9}},grid:{drawOnChartArea:false}}}}
+  });
+}
+
+// COMPARE
+async function loadCompare(){
+  document.getElementById('compareBody').innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted)"><div style="display:inline-flex;gap:.5rem;align-items:center"><div class="spin-el"></div>Loading…</div></td></tr>';
+  const names='Tunis,Sfax,Sousse,Kairouan,Bizerte,Tozeur,Jendouba,Gabès,Monastir,Mahdia,Ariana,Ben Arous,Nabeul,Le Kef,Gafsa,Médenine';
+  const data=await fetch(`/api/climate/compare?cities=${encodeURIComponent(names)}`).then(r=>r.json());
+  if(cmpChartInst) cmpChartInst.destroy();
+  cmpChartInst=new Chart(document.getElementById('compareChart').getContext('2d'),{
+    type:'bar',data:{labels:data.map(c=>c.city),datasets:[
+      {label:'Temp °C',data:data.map(c=>c.temp),yAxisID:'y',borderRadius:4,
+       backgroundColor:data.map(c=>c.temp>38?'#9e1e1e':c.temp>30?'#c85020':c.temp>22?'#d4540a':'#c47a18')},
+      {label:'Risk Score',data:data.map(c=>c.risk_score),yAxisID:'y2',type:'line',
+       borderColor:'#205a8b',backgroundColor:'rgba(32,90,139,.08)',tension:.4,pointRadius:4,borderWidth:2},
+      {label:'Sustainability',data:data.map(c=>c.sustainability_score),yAxisID:'y2',type:'line',
+       borderColor:'#2d7a3e',backgroundColor:'rgba(45,122,62,.05)',tension:.4,pointRadius:3,borderWidth:2,borderDash:[4,3]},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#8c7e70',font:{family:'JetBrains Mono',size:10},boxWidth:12}}},
+      scales:{x:{ticks:{color:'#8c7e70',font:{family:'JetBrains Mono',size:9}},grid:{color:'#e2d8cc'}},
+              y:{position:'left',ticks:{color:'#8c7e70',font:{family:'JetBrains Mono',size:9}},grid:{color:'#e2d8cc'},title:{display:true,text:'°C',color:'#8c7e70',font:{size:9}}},
+              y2:{position:'right',ticks:{color:'#8c7e70',font:{family:'JetBrains Mono',size:9}},grid:{drawOnChartArea:false},title:{display:true,text:'Score',color:'#8c7e70',font:{size:9}}}}}
+  });
+  document.getElementById('compareBody').innerHTML=data.map(c=>`
+    <tr onclick="switchCTab(document.querySelector('[data-ctab=city]'),'city');selectCity('${c.city}')">
+      <td style="font-weight:600">${c.city}</td>
+      <td style="font-family:var(--mono);font-size:.72rem;color:var(--muted)">${c.region}</td>
+      <td style="font-family:var(--mono)">${c.temp}°C</td>
+      <td style="font-family:var(--mono)">${c.humidity}%</td>
+      <td>${chip(c.flood)}</td><td>${chip(c.heat)}</td><td>${chip(c.drought)}</td>
+      <td><span style="font-family:var(--mono);font-weight:600;color:${c.risk_score<=3?'#2d7a3e':c.risk_score<=5?'#c47a18':c.risk_score<=7.5?'#c85020':'#9e1e1e'}">${c.risk_score}</span></td>
+      <td><span style="font-family:var(--mono);color:var(--orange)">${c.sustainability_score}</span> <span style="color:var(--muted);font-size:.7rem">(${c.grade})</span></td>
+    </tr>`).join('');
+}
+
+// DASHBOARD
+async function loadCDash(){
+  if(cdashLoaded) return; cdashLoaded=true;
+  const data=await fetch('/api/climate/dashboard').then(r=>r.json());
+  const sorted=data.cities.sort((a,b)=>a.risk_score-b.risk_score);
+  const sortedSust=[...data.cities].sort((a,b)=>b.sustainability-a.sustainability);
+  const avg=(data.cities.reduce((s,c)=>s+c.risk_score,0)/data.cities.length).toFixed(2);
+  const safest=sorted[0]; const mostSust=sortedSust[0];
+  document.getElementById('cdKpi2').textContent=avg;
+  document.getElementById('cdKpi3').textContent=safest?.city||'—';
+  document.getElementById('cdKpi4').textContent=mostSust?.city||'—';
+  const bOpts={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{ticks:{color:'#8c7e70',font:{family:'JetBrains Mono',size:9}},grid:{color:'#e2d8cc'}},
+            y:{ticks:{color:'#8c7e70',font:{family:'JetBrains Mono',size:9}},grid:{color:'#e2d8cc'}}}};
+  new Chart(document.getElementById('cdRisk').getContext('2d'),{type:'bar',data:{labels:sorted.map(c=>c.city),
+    datasets:[{label:'Risk Score',data:sorted.map(c=>c.risk_score),borderRadius:4,
+               backgroundColor:sorted.map(c=>c.risk_score<=3?'#2d7a3e':c.risk_score<=5?'#c47a18':c.risk_score<=7.5?'#c85020':'#9e1e1e')}]},options:bOpts});
+  new Chart(document.getElementById('cdSust').getContext('2d'),{type:'bar',data:{labels:sortedSust.map(c=>c.city),
+    datasets:[{label:'Sustainability',data:sortedSust.map(c=>c.sustainability),borderRadius:4,
+               backgroundColor:sortedSust.map(c=>c.sustainability>=75?'#2d7a3e':c.sustainability>=60?'#c47a18':'#c85020')}]},options:bOpts});
+  document.querySelector('#cdTable tbody').innerHTML=sorted.map(c=>{
+    const sc=c.sustainability>=75?'#2d7a3e':c.sustainability>=60?'#c47a18':'#c85020';
+    return `<tr onclick="switchCTab(document.querySelector('[data-ctab=city]'),'city');selectCity('${c.city}')">
+      <td style="font-weight:600">${c.city}</td>
+      <td style="font-family:var(--mono);font-size:.72rem;color:var(--muted)">${c.region}</td>
+      <td>${c.coastal?'🌊':'—'}</td>
+      <td>${chip(c.flood)}</td><td>${chip(c.heat)}</td><td>${chip(c.earthquake)}</td><td>${chip(c.drought)}</td>
+      <td><span style="font-family:var(--mono);font-weight:600;color:${RC[c.risk_category]||'#8c7e70'}">${c.risk_score}</span></td>
+      <td><span style="font-family:var(--mono);color:var(--orange)">${c.sustainability}</span></td>
+      <td><span class="sust-badge" style="background:${sc}18;color:${sc};border:1px solid ${sc}33">${c.grade}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+// REGIONAL HEATMAP + LEAFLET MAP
+// ═══════════════════════════════════════
+let hmLoaded=false, leafletMap=null, mapMarkers=[];
+const RC_HM={
+  'Low':      {bg:'#e6f0e8',border:'#b8dcc0',text:'#2d7a3e',dot:'#2d7a3e',fill:'#2d7a3e',opacity:0.65},
+  'Moderate': {bg:'#fef3e0',border:'#f0d090',text:'#c47a18',dot:'#c47a18',fill:'#c47a18',opacity:0.70},
+  'High':     {bg:'#fde8e0',border:'#e8b0a0',text:'#c85020',dot:'#c85020',fill:'#c85020',opacity:0.75},
+  'Very High':{bg:'#fde0e0',border:'#e0a0a0',text:'#9e1e1e',dot:'#9e1e1e',fill:'#9e1e1e',opacity:0.85},
+};
+
+function initLeafletMap() {
+  if(leafletMap) return;
+  leafletMap = L.map('tunisiaMap', {
+    center: [33.8, 9.5],
+    zoom: 6,
+    zoomControl: true,
+    attributionControl: true
+  });
+  // CartoDB Positron — clean white/grey base, minimal text, no color clash
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 12
+  }).addTo(leafletMap);
+}
+
+// Colour scale: risk 0–10 mapped to NOAA-style gradient
+// Low(green) → Moderate(yellow) → High(orange) → Very High(red)
+function riskToColor(score) {
+  // Normalize actual data range (1.0–5.5) to 0–1 for full color spectrum
+  const t = Math.min(Math.max((score - 1.0) / 4.5, 0), 1);
+  // NOAA-style gradient: green → yellow-green → yellow → orange → red
+  const stops = [
+    [0.00, [20,  140, 20,  0.82]],   // deep green  (low risk  ~1.0)
+    [0.20, [80,  190, 50,  0.84]],   // green
+    [0.38, [160, 215, 0,   0.86]],   // yellow-green
+    [0.52, [255, 215, 0,   0.87]],   // yellow      (moderate ~3.3)
+    [0.68, [255, 140, 0,   0.89]],   // orange
+    [0.82, [220, 50,  20,  0.91]],   // red-orange
+    [1.00, [160, 0,   0,   0.93]],   // deep red    (high ~5.5)
+  ];
+  let r=20,g=140,b=20,a=0.82;
+  for(let i=0; i<stops.length-1; i++){
+    const [t0,[r0,g0,b0,a0]] = stops[i];
+    const [t1,[r1,g1,b1,a1]] = stops[i+1];
+    if(t >= t0 && t <= t1){
+      const f = (t-t0)/(t1-t0);
+      r = Math.round(r0+(r1-r0)*f);
+      g = Math.round(g0+(g1-g0)*f);
+      b = Math.round(b0+(b1-b0)*f);
+      a = +(a0+(a1-a0)*f).toFixed(2);
+      break;
+    }
+  }
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// Stroke colour (slightly darker than fill)
+function riskToStroke(score) {
+  // Same normalization as riskToColor
+  const t = Math.min(Math.max((score - 1.0) / 4.5, 0), 1);
+  if(t < 0.25) return '#0a6600';
+  if(t < 0.45) return '#5a9900';
+  if(t < 0.60) return '#cc8800';
+  if(t < 0.75) return '#bb3300';
+  return '#880000';
+}
+
+let geojsonLayer = null;
+
+function updateMapMarkers(allCities) {
+  // Clear previous layers
+  mapMarkers.forEach(m => m.remove());
+  mapMarkers = [];
+  if(geojsonLayer){ geojsonLayer.remove(); geojsonLayer = null; }
+
+  // Build lookup: city name → risk score
+  const cityRisk = {};
+  const cityData = {};
+  allCities.forEach(c => {
+    cityRisk[c.city] = c.combined_risk_score;
+    cityData[c.city] = c;
+  });
+
+  // ── CHOROPLETH LAYER (filled polygons like NOAA map) ─────────────────────
+  const GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"name":"Bizerte"},"geometry":{"type":"Polygon","coordinates":[[[9.48,37.08],[10.1,37.0],[10.45,37.15],[10.32,37.58],[9.98,37.55],[9.68,37.42],[9.55,37.22],[9.48,37.08]]]}},{"type":"Feature","properties":{"name":"Ariana"},"geometry":{"type":"Polygon","coordinates":[[[10.1,36.98],[10.48,36.95],[10.5,37.18],[10.35,37.22],[10.1,37.12],[10.1,36.98]]]}},{"type":"Feature","properties":{"name":"Tunis"},"geometry":{"type":"Polygon","coordinates":[[[10.1,36.72],[10.38,36.7],[10.5,36.78],[10.5,36.95],[10.48,36.95],[10.1,36.98],[10.05,36.88],[10.1,36.72]]]}},{"type":"Feature","properties":{"name":"Ben Arous"},"geometry":{"type":"Polygon","coordinates":[[[10.2,36.58],[10.5,36.6],[10.55,36.78],[10.5,36.78],[10.38,36.7],[10.2,36.65],[10.2,36.58]]]}},{"type":"Feature","properties":{"name":"Nabeul"},"geometry":{"type":"Polygon","coordinates":[[[10.38,36.7],[10.55,36.78],[10.72,36.85],[11.1,36.38],[11.05,36.15],[10.68,36.02],[10.38,36.18],[10.22,36.4],[10.38,36.7]]]}},{"type":"Feature","properties":{"name":"Hammamet"},"geometry":{"type":"Polygon","coordinates":[[[10.22,36.4],[10.38,36.4],[10.38,36.58],[10.2,36.58],[10.1,36.5],[10.22,36.4]]]}},{"type":"Feature","properties":{"name":"Zaghouan"},"geometry":{"type":"Polygon","coordinates":[[[9.8,36.22],[10.22,36.12],[10.38,36.18],[10.22,36.4],[10.1,36.5],[9.92,36.48],[9.72,36.38],[9.8,36.22]]]}},{"type":"Feature","properties":{"name":"B\u00e9ja"},"geometry":{"type":"Polygon","coordinates":[[[8.88,36.62],[9.48,36.52],[9.72,36.55],[9.68,37.08],[9.48,37.08],[9.18,37.08],[8.88,36.95],[8.82,36.78],[8.88,36.62]]]}},{"type":"Feature","properties":{"name":"Jendouba"},"geometry":{"type":"Polygon","coordinates":[[[8.28,36.38],[8.65,36.28],[8.88,36.32],[8.88,36.62],[8.82,36.78],[8.65,36.92],[8.35,36.85],[8.22,36.65],[8.28,36.38]]]}},{"type":"Feature","properties":{"name":"Le Kef"},"geometry":{"type":"Polygon","coordinates":[[[8.28,35.78],[8.65,35.72],[9.22,35.78],[9.48,36.08],[9.48,36.52],[8.88,36.62],[8.82,36.52],[8.48,36.35],[8.28,36.18],[8.22,35.98],[8.28,35.78]]]}},{"type":"Feature","properties":{"name":"Siliana"},"geometry":{"type":"Polygon","coordinates":[[[9.22,35.78],[9.72,35.68],[9.8,35.85],[9.92,36.1],[9.8,36.22],[9.72,36.38],[9.48,36.3],[9.48,36.08],[9.22,35.78]]]}},{"type":"Feature","properties":{"name":"Kairouan"},"geometry":{"type":"Polygon","coordinates":[[[9.22,35.4],[9.72,35.22],[10.22,35.3],[10.38,35.62],[10.22,35.92],[9.8,35.88],[9.8,35.85],[9.72,35.68],[9.22,35.78],[9.08,35.6],[9.22,35.4]]]}},{"type":"Feature","properties":{"name":"Sousse"},"geometry":{"type":"Polygon","coordinates":[[[10.22,35.3],[10.45,35.22],[10.78,35.25],[11.08,35.48],[11.05,35.88],[10.68,36.02],[10.55,35.8],[10.38,35.62],[10.22,35.3]]]}},{"type":"Feature","properties":{"name":"Monastir"},"geometry":{"type":"Polygon","coordinates":[[[10.55,35.8],[10.68,36.02],[11.05,35.88],[11.12,35.62],[10.92,35.45],[10.62,35.42],[10.55,35.55],[10.55,35.8]]]}},{"type":"Feature","properties":{"name":"Mahdia"},"geometry":{"type":"Polygon","coordinates":[[[10.62,35.42],[10.92,35.45],[11.12,35.62],[11.28,35.38],[11.25,35.15],[10.95,35.08],[10.72,35.18],[10.62,35.42]]]}},{"type":"Feature","properties":{"name":"Sfax"},"geometry":{"type":"Polygon","coordinates":[[[9.85,34.25],[10.42,34.18],[11.05,34.35],[11.25,34.78],[11.28,35.15],[10.95,35.08],[10.72,35.18],[10.62,35.42],[10.55,35.55],[10.38,35.22],[10.22,35.3],[9.72,35.22],[9.72,34.85],[9.85,34.55],[9.85,34.25]]]}},{"type":"Feature","properties":{"name":"Kasserine"},"geometry":{"type":"Polygon","coordinates":[[[7.98,34.72],[8.62,34.6],[8.88,34.68],[9.22,35.0],[9.22,35.4],[9.08,35.6],[8.65,35.72],[8.28,35.78],[8.22,35.42],[7.98,35.22],[7.92,34.98],[7.98,34.72]]]}},{"type":"Feature","properties":{"name":"Sidi Bouzid"},"geometry":{"type":"Polygon","coordinates":[[[9.22,35.0],[9.72,34.85],[9.72,35.22],[9.22,35.4],[9.22,35.0]]]}},{"type":"Feature","properties":{"name":"Gafsa"},"geometry":{"type":"Polygon","coordinates":[[[7.72,33.98],[8.28,33.88],[8.88,33.95],[9.22,34.22],[9.22,35.0],[8.88,34.68],[8.62,34.6],[7.98,34.72],[7.72,34.42],[7.72,33.98]]]}},{"type":"Feature","properties":{"name":"Tozeur"},"geometry":{"type":"Polygon","coordinates":[[[7.52,33.55],[7.98,33.42],[8.22,33.48],[8.62,33.6],[8.88,33.95],[8.28,33.88],[7.72,33.98],[7.72,33.75],[7.52,33.55]]]}},{"type":"Feature","properties":{"name":"Kebili"},"geometry":{"type":"Polygon","coordinates":[[[8.22,33.48],[8.62,33.6],[8.88,33.95],[9.22,34.22],[9.85,34.0],[9.85,33.42],[9.62,32.98],[9.18,32.9],[8.82,32.88],[8.48,33.05],[8.22,33.28],[8.22,33.48]]]}},{"type":"Feature","properties":{"name":"Gab\u00e8s"},"geometry":{"type":"Polygon","coordinates":[[[9.22,34.22],[9.85,34.0],[9.85,33.82],[9.62,33.55],[9.4,33.45],[9.18,33.52],[8.88,33.95],[9.22,34.22]]]}},{"type":"Feature","properties":{"name":"M\u00e9denine"},"geometry":{"type":"Polygon","coordinates":[[[9.62,32.98],[9.85,33.42],[9.85,33.82],[10.22,34.0],[10.85,33.55],[11.22,33.18],[11.25,32.78],[10.98,32.6],[9.98,32.58],[9.62,32.7],[9.62,32.98]]]}},{"type":"Feature","properties":{"name":"Tataouine"},"geometry":{"type":"Polygon","coordinates":[[[9.18,32.9],[9.62,32.7],[9.98,32.58],[10.98,32.6],[11.25,32.78],[11.25,31.5],[10.52,30.35],[9.52,30.22],[8.88,30.42],[8.62,31.12],[8.48,32.08],[8.82,32.88],[9.18,32.9]]]}}]};
+
+  geojsonLayer = L.geoJSON(GEOJSON, {
+    style: function(feature) {
+      const name  = feature.properties.name;
+      const score = cityRisk[name] || 0;
+      return {
+        fillColor:   riskToColor(score),
+        fillOpacity: 1,
+        color:       riskToStroke(score),
+        weight:      1.2,
+        opacity:     0.9
+      };
+    },
+    onEachFeature: function(feature, layer) {
+      const name = feature.properties.name;
+      const c    = cityData[name];
+      if(!c) return;
+      const rc   = RC_HM[c.combined_risk_cat] || RC_HM['Moderate'];
+      const sust_color = c.sustainability_score>=70?'#2d7a3e':c.sustainability_score>=55?'#c47a18':'#c85020';
+
+      layer.on('mouseover', function(e) {
+        this.setStyle({ weight: 2.5, fillOpacity: 1.0, color: '#1c1612' });
+        layer.openPopup();
+      });
+      layer.on('mouseout',  function(e) {
+        geojsonLayer.resetStyle(this);
+        layer.closePopup();
+      });
+      layer.on('click', function() {
+        switchCTab(document.querySelector('[data-ctab=city]'),'city');
+        selectCity(c.city);
+      });
+
+      layer.bindPopup(L.popup({ maxWidth: 230 }).setContent(`
+        <div class="map-popup">
+          <div class="map-popup-city">${c.city}${c.coastal?' 🌊':''}</div>
+          <div style="font-family:monospace;font-size:.65rem;color:${rc.text};margin-bottom:.25rem">
+            ${c.combined_risk_cat} Risk &nbsp;·&nbsp; <b>${c.combined_risk_score}</b>/10
+          </div>
+          <div class="map-risk-bar">
+            <div class="map-risk-fill" style="width:${c.combined_risk_score*10}%;background:${riskToColor(c.combined_risk_score)}"></div>
+          </div>
+          <div style="font-family:monospace;font-size:.58rem;color:#8c7e70;margin:.3rem 0">
+            🌡 ${c.realtime_temp}°C &nbsp; 🌧 ${c.realtime_precip}mm &nbsp; 💧 ${c.realtime_humidity||'—'}%
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.3rem">
+            <span style="font-family:monospace;font-size:.58rem;color:${sust_color}">🌱 ${c.sustainability_score}/100</span>
+            <span class="map-popup-go" onclick="switchCTab(document.querySelector('[data-ctab=city]'),'city');selectCity('${c.city}')">→ Full Analysis</span>
+          </div>
+        </div>
+      `));
+    }
+  }).addTo(leafletMap);
+
+  // ── CITY LABEL DOTS on top (small, just for name reference) ────────────────
+  allCities.forEach(c => {
+    const dot = L.circleMarker([c.lat, c.lon], {
+      radius: 4,
+      fillColor: '#1c1612',
+      color: '#f5ede0',
+      weight: 1.2,
+      fillOpacity: 0.9,
+      opacity: 1
+    }).addTo(leafletMap);
+    dot.bindTooltip(c.city, {
+      permanent: false, direction: 'top',
+      className: '', offset: [0, -6],
+      opacity: 0.95
+    });
+    mapMarkers.push(dot);
+  });
+
+  // ── COLOUR LEGEND (like NOAA) ─────────────────────────────────────────────
+  if(!leafletMap._legendAdded) {
+    leafletMap._legendAdded = true;
+    const legend = L.control({ position: 'bottomright' });
+    legend.onAdd = function() {
+      const d = L.DomUtil.create('div');
+      d.style.cssText = 'background:#ffffffcc;padding:.5rem .75rem;border-radius:6px;font-family:monospace;font-size:.62rem;line-height:1.6;box-shadow:0 2px 8px rgba(0,0,0,.2)';
+      const steps = [
+        [1.0, 'Low'],       [1.8, 'Low'],
+        [2.5, 'Low-Mod'],  [3.2, 'Moderate'],
+        [3.8, 'Moderate'], [4.5, 'Mod-High'],
+        [5.0, 'High'],     [5.5, 'High']
+      ];
+      d.innerHTML = '<b style="display:block;margin-bottom:.3rem">Risk Level</b>' +
+        steps.map(([v,lbl]) =>
+          `<div style="display:flex;align-items:center;gap:.4rem">
+            <div style="width:28px;height:12px;border-radius:2px;background:${riskToColor(v)};border:1px solid ${riskToStroke(v)}"></div>
+            <span>${v.toFixed(0)}  ${lbl}</span>
+          </div>`
+        ).join('');
+      return d;
+    };
+    legend.addTo(leafletMap);
+  }
+}
+
+
+async function loadHeatmap() {
+  // Init map first
+  if(!leafletMap) initLeafletMap();
+  
+  if(document.getElementById('hmRegionGrid'))
+    document.getElementById('hmRegionGrid').innerHTML='<div class="loading"><div class="spin-el"></div>Fetching real-time data…</div>';
+  
+  const data = await fetch('/api/climate/regional_heatmap').then(r=>r.json());
+  
+  // Timestamp
+  const ts=document.getElementById('hmTimestamp');
+  if(ts) ts.textContent='⏱ '+new Date(data.timestamp).toLocaleTimeString();
+
+  // Flatten all cities
+  const allCities = Object.values(data.regions).flatMap(r=>r.cities);
+  
+  // Update map markers
+  updateMapMarkers(allCities);
+
+  // Region cards
+  const grid=document.getElementById('hmRegionGrid');
+  if(grid) grid.innerHTML=Object.entries(data.regions)
+    .sort((a,b)=>b[1].avg_combined_risk-a[1].avg_combined_risk)
+    .map(([region,rd])=>{
+      const cat=rd.region_risk_category; const rc=RC_HM[cat]||RC_HM['Moderate'];
+      const pct=(rd.avg_combined_risk/10*100).toFixed(0);
+      return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);border-top:4px solid ${rc.dot}">
+        <div style="padding:.9rem 1rem;background:${rc.bg}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div><div style="font-family:var(--serif);font-size:1.05rem">${region}</div>
+            <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.15rem">${rd.n_cities} cities · ${rd.avg_realtime_temp}°C</div></div>
+            <div style="text-align:right"><div style="font-family:var(--mono);font-size:1.4rem;font-weight:500;color:${rc.text}">${rd.avg_combined_risk}</div><div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">/10</div></div>
+          </div>
+          <div style="margin-top:.7rem;height:6px;background:rgba(0,0,0,.08);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${rc.dot};border-radius:3px;transition:width .6s"></div></div>
+          <div style="display:flex;justify-content:space-between;margin-top:.3rem">
+            <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">Historical: ${rd.avg_historical_risk}</span>
+            <span style="font-family:var(--mono);font-size:.58rem;padding:.15rem .48rem;border-radius:3px;background:${rc.dot}20;color:${rc.text};border:1px solid ${rc.border}">${cat}</span>
+          </div>
+        </div>
+        <div style="padding:.6rem .9rem;border-top:1px solid var(--border);display:flex;gap:.3rem;flex-wrap:wrap">
+          ${rd.cities.map(c=>`<span onclick="switchCTab(document.querySelector('[data-ctab=city]'),'city');selectCity('${c.city}')" style="font-family:var(--mono);font-size:.58rem;padding:.18rem .42rem;border-radius:3px;cursor:pointer;background:${(RC_HM[c.combined_risk_cat]||RC_HM.Moderate).bg};color:${(RC_HM[c.combined_risk_cat]||RC_HM.Moderate).text};border:1px solid ${(RC_HM[c.combined_risk_cat]||RC_HM.Moderate).border}">${c.city}</span>`).join('')}
+        </div>
+      </div>`;
+    }).join('');
+
+  // City table
+  const tbody=document.getElementById('hmTableBody');
+  if(tbody) tbody.innerHTML=allCities
+    .sort((a,b)=>b.combined_risk_score-a.combined_risk_score)
+    .map(c=>{
+      const rc=RC_HM[c.combined_risk_cat]||RC_HM.Moderate;
+      const hrc=RC_HM[c.historical_risk_cat]||RC_HM.Moderate;
+      return `<tr style="border-bottom:1px solid rgba(226,216,204,.5);cursor:pointer" onclick="switchCTab(document.querySelector('[data-ctab=city]'),'city');selectCity('${c.city}')" onmouseover="this.style.background='var(--warm)'" onmouseout="this.style.background=''">
+        <td style="padding:.6rem .8rem;font-weight:600">${c.city}${c.coastal?'<span style="font-size:.55rem;margin-left:.3rem;color:#205a8b">🌊</span>':''}</td>
+        <td style="font-family:var(--mono);font-size:.7rem;color:var(--muted);padding:.6rem .8rem">${c.lat}°N</td>
+        <td style="font-family:var(--mono);text-align:center;padding:.6rem .8rem">${c.realtime_temp}°C</td>
+        <td style="font-family:var(--mono);text-align:center;padding:.6rem .8rem;color:#205a8b">${c.realtime_precip}mm</td>
+        <td style="padding:.6rem .8rem"><span style="font-family:var(--mono);font-size:.62rem;padding:.18rem .48rem;border-radius:3px;background:${hrc.bg};color:${hrc.text};border:1px solid ${hrc.border}">${c.historical_risk_score}/10</span></td>
+        <td style="padding:.6rem .8rem"><div style="display:flex;align-items:center;gap:.5rem"><div style="flex:1;height:6px;background:var(--warm2);border-radius:3px;overflow:hidden;min-width:50px"><div style="height:100%;width:${(c.combined_risk_score/10*100).toFixed(0)}%;background:${rc.dot};border-radius:3px"></div></div><span style="font-family:var(--mono);font-size:.7rem;font-weight:600;color:${rc.text}">${c.combined_risk_score}</span><span style="font-family:var(--mono);font-size:.57rem;padding:.15rem .42rem;border-radius:3px;background:${rc.bg};color:${rc.text};border:1px solid ${rc.border}">${c.combined_risk_cat}</span></div></td>
+        <td style="font-family:var(--mono);text-align:center;padding:.6rem .8rem"><span style="color:${c.sustainability_score>=70?'#2d7a3e':c.sustainability_score>=55?'#c47a18':'#c85020'};font-family:var(--serif)">${c.sustainability_grade}</span> <span style="color:var(--muted)">${c.sustainability_score}</span></td>
+      </tr>`;
+    }).join('');
+}
+
+function closeMod(id){document.getElementById(id).classList.remove('open')}
+
+</script>
+</body>
+</html>
