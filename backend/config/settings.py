@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'scraper',
     'valuation',
     'legal',
+    'simulation_bridge',
 ]
 
 MIDDLEWARE = [

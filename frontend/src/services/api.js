@@ -35,6 +35,8 @@ export const getClimateRegionalHeatmap = () => api.get('/climate/regional_heatma
 export const getPortfolio = () => api.get('/portfolio/');
 export const getScope = () => api.get('/scanner/opportunities/');
 export const getMarketSimulation = (data) => api.post('/simulations/', data);
+export const getSimulationCatalog = () => api.get('/simulations/catalog/');
+export const runSimulationPreview = (params) => api.get('/simulations/preview/', { params });
 export const getCampaignStats = () => api.get('/campaign/stats/');
 
 // Interactive map endpoints (Phase 4)
