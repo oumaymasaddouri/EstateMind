@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import Topbar from './components/Navigation/Topbar';
 import Footer from './components/Navigation/Footer';
 import { AuthProvider } from './context/AuthContext';
@@ -20,6 +20,11 @@ import AnalyzePage from './pages/AnalyzePage';
 import ValuatePage from './pages/ValuatePage';
 import LegalAIPage from './pages/LegalAIPage';
 import InvestPage from './pages/InvestPage';
+import InvestPortfolioPage from './pages/investor/InvestPortfolioPage';
+import InvestScannerPage from './pages/investor/InvestScannerPage';
+import InvestOpportunitiesPage from './pages/investor/InvestOpportunitiesPage';
+import InvestRiskPage from './pages/investor/InvestRiskPage';
+import InvestAssetsPage from './pages/investor/InvestAssetsPage';
 import SimulatePage from './pages/SimulatePage';
 import AccountDashboardPage from './pages/AccountDashboardPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -57,7 +62,15 @@ function AppLayout() {
           <Route path="/valuate" element={<ValuatePage />} />
 
           {/* Invest Routes */}
-          <Route path="/invest" element={<InvestPage />} />
+          <Route path="/invest" element={<InvestPage />}>
+            <Route index element={<Navigate to="portfolio" replace />} />
+            <Route path="portfolio" element={<InvestPortfolioPage />} />
+            <Route path="scanner" element={<InvestScannerPage />} />
+            <Route path="opportunities" element={<InvestOpportunitiesPage />} />
+            <Route path="risk" element={<InvestRiskPage />} />
+            <Route path="assets" element={<InvestAssetsPage />} />
+            <Route path="*" element={<Navigate to="portfolio" replace />} />
+          </Route>
 
           {/* Simulate Routes */}
           <Route path="/simulate" element={<SimulatePage />} />

@@ -13,9 +13,11 @@ export { default as AnalyzeDashboardsPage } from './AnalyzeDashboardsPage';
 export { default as AnalyzeClimatePage } from './AnalyzeClimatePage';
 
 // Invest
-export { default as InvestPortfolioPage } from './InvestPortfolioPage';
-export { default as InvestScannerPage } from './InvestScannerPage';
-export { default as InvestOpportunitiesPage } from './InvestOpportunitiesPage';
+export { default as InvestPortfolioPage } from './investor/InvestPortfolioPage';
+export { default as InvestScannerPage } from './investor/InvestScannerPage';
+export { default as InvestOpportunitiesPage } from './investor/InvestOpportunitiesPage';
+export { default as InvestRiskPage } from './investor/InvestRiskPage';
+export { default as InvestAssetsPage } from './investor/InvestAssetsPage';
 
 // Simulate
 export { default as SimulateMarketPage } from './SimulateMarketPage';
