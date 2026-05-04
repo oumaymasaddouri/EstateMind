@@ -1,0 +1,25 @@
+city,region,lat,lon,coastal,temp_c,humidity,precip_now,flood_risk_100,flood_cat,heat_index_c,heat_level,heat_risk_100,drought_spi,drought_level,livability_score,infrastructure_score,sustainability_score,sustainability_cat,hist_risk,combined_risk,combined_cat
+Tunis,North,36.82,10.17,True,26.6,36,1.4,46.6,Moderate,26.3,Safe,18.0,-0.064,Mildly Dry,86.9,90.4,76.6,Low,5.1,3.83,Moderate
+Sfax,Center-East,34.74,10.76,True,26.6,41,0.37,20.9,Low,26.4,Safe,18.3,-1.823,Moderate Drought,77.7,85.6,80.5,Low,4.9,3.59,Moderate
+Sousse,Center-East,35.83,10.64,True,28.7,69,1.39,22.6,Low,31.9,Safe,34.0,2.122,Wet,80.2,88.0,78.1,Low,3.9,3.15,Moderate
+Kairouan,Center,35.68,9.11,False,26.1,48,1.09,19.8,Low,26.0,Safe,17.1,1.403,Wet,69.3,77.6,77.0,Low,5.8,4.25,Moderate
+Bizerte,North,37.27,9.87,True,24.9,73,2.01,47.6,Moderate,25.4,Safe,15.4,0.812,Normal,78.5,82.4,72.7,Low,2.8,2.16,Low
+Gabès,South-East,33.88,9.9,True,31.6,69,0.56,21.2,Low,38.9,Caution,54.0,0.41,Normal,63.8,75.2,67.0,Moderate,6.55,5.14,High
+Ariana,North,36.86,10.19,False,25.7,63,0.47,42.8,Moderate,26.0,Safe,17.1,-2.212,Extreme Drought,88.6,92.0,78.7,Low,5.1,3.67,Moderate
+Gafsa,South-West,34.43,8.78,False,30.0,45,0.0,6.0,Low,30.3,Safe,29.4,-3.0,Extreme Drought,57.9,69.6,73.6,Low,6.25,4.75,Moderate
+Monastir,Center-East,35.77,10.83,True,28.8,56,0.75,21.5,Low,30.1,Safe,28.9,-0.292,Mildly Dry,76.0,84.0,77.4,Low,4.9,3.79,Moderate
+Nabeul,North-East,36.45,10.73,True,28.1,41,1.59,10.9,Low,27.8,Safe,22.3,1.166,Wet,71.8,80.0,79.8,Low,1.6,1.51,Low
+Béja,North-West,36.73,9.18,False,23.4,41,1.32,44.2,Moderate,22.9,Safe,8.3,-0.701,Mildly Dry,61.7,66.4,66.9,Moderate,2.8,2.09,Low
+Jendouba,North-West,36.5,8.78,False,24.1,37,2.18,63.6,High,23.5,Safe,10.0,0.811,Normal,67.6,72.0,63.6,Moderate,3.7,2.81,Moderate
+Tozeur,South-West,33.92,8.13,False,32.9,69,1.18,8.0,Low,42.7,Danger,64.9,3.0,Wet,47.0,59.2,60.6,Moderate,5.95,4.88,Moderate
+Médenine,South,33.35,10.5,False,28.3,53,1.44,8.4,Low,29.1,Safe,26.0,3.0,Wet,49.5,61.6,69.5,Moderate,5.95,4.56,Moderate
+Kasserine,Center-West,35.17,8.83,False,28.3,74,1.15,7.9,Low,31.9,Safe,34.0,1.947,Wet,55.0,64.0,70.1,Low,4.6,3.58,Moderate
+Mahdia,Center-East,35.5,11.06,True,26.8,39,0.43,21.0,Low,26.7,Safe,19.1,-1.56,Moderate Drought,69.3,77.6,76.2,Low,4.9,3.61,Moderate
+Ben Arous,North,36.75,10.22,False,24.2,49,1.59,44.6,Moderate,24.0,Safe,11.4,0.615,Normal,87.8,91.2,78.9,Low,5.1,3.73,Moderate
+Siliana,North-West,36.08,9.37,False,26.4,41,0.0,6.0,Low,26.2,Safe,17.7,-3.0,Extreme Drought,53.3,58.4,72.3,Low,1.6,1.22,Low
+Le Kef,North-West,36.18,8.71,False,24.5,64,1.13,43.9,Moderate,24.7,Safe,13.4,-0.834,Mildly Dry,48.3,53.6,59.4,Moderate,2.8,2.07,Low
+Hammamet,North-East,36.4,10.62,True,26.5,48,0.69,9.4,Low,26.5,Safe,18.6,-1.286,Moderate Drought,65.9,74.4,78.1,Low,1.6,1.3,Low
+Zaghouan,North,36.4,10.14,False,26.7,39,0.95,7.6,Low,26.6,Safe,18.9,-0.765,Mildly Dry,56.7,61.6,73.3,Low,1.6,1.34,Low
+Kebili,South,33.7,8.97,False,30.9,45,0.01,6.0,Low,31.6,Safe,33.1,-3.0,Extreme Drought,41.1,53.6,64.6,Moderate,5.95,4.61,Moderate
+Sidi Bouzid,Center,35.04,9.49,False,27.8,52,1.49,8.5,Low,28.4,Safe,24.0,3.0,Wet,58.4,67.2,73.6,Low,5.95,4.52,Moderate
+Tataouine,South,32.93,10.45,False,30.2,55,0.33,6.6,Low,32.2,Caution,34.9,-0.465,Mildly Dry,37.7,50.4,62.4,Moderate,5.95,4.59,Moderate

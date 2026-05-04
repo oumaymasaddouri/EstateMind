@@ -1,0 +1,73 @@
+city,scenario,sustainability_score
+Tunis,Baseline (Today),77.1
+Sfax,Baseline (Today),76.2
+Sousse,Baseline (Today),77.6
+Kairouan,Baseline (Today),76.2
+Bizerte,Baseline (Today),71.5
+Gabès,Baseline (Today),69.5
+Ariana,Baseline (Today),78.4
+Gafsa,Baseline (Today),64.7
+Monastir,Baseline (Today),78.4
+Nabeul,Baseline (Today),79.9
+Béja,Baseline (Today),65.4
+Jendouba,Baseline (Today),62.9
+Tozeur,Baseline (Today),65.8
+Médenine,Baseline (Today),65.9
+Kasserine,Baseline (Today),74.3
+Mahdia,Baseline (Today),75.1
+Ben Arous,Baseline (Today),77.8
+Siliana,Baseline (Today),72.4
+Le Kef,Baseline (Today),60.6
+Hammamet,Baseline (Today),78.5
+Zaghouan,Baseline (Today),71.6
+Kebili,Baseline (Today),62.3
+Sidi Bouzid,Baseline (Today),75.1
+Tataouine,Baseline (Today),62.1
+Tunis,+2°C (2050),73.4
+Sfax,+2°C (2050),74.8
+Sousse,+2°C (2050),76.3
+Kairouan,+2°C (2050),73.2
+Bizerte,+2°C (2050),71.3
+Gabès,+2°C (2050),66.9
+Ariana,+2°C (2050),75.9
+Gafsa,+2°C (2050),68.6
+Monastir,+2°C (2050),78.2
+Nabeul,+2°C (2050),77.9
+Béja,+2°C (2050),65.2
+Jendouba,+2°C (2050),60.3
+Tozeur,+2°C (2050),59.3
+Médenine,+2°C (2050),69.6
+Kasserine,+2°C (2050),70.9
+Mahdia,+2°C (2050),73.7
+Ben Arous,+2°C (2050),75.0
+Siliana,+2°C (2050),71.4
+Le Kef,+2°C (2050),56.8
+Hammamet,+2°C (2050),74.8
+Zaghouan,+2°C (2050),72.6
+Kebili,+2°C (2050),61.6
+Sidi Bouzid,+2°C (2050),74.1
+Tataouine,+2°C (2050),59.8
+Tunis,+4°C (2100),74.2
+Sfax,+4°C (2100),77.2
+Sousse,+4°C (2100),76.2
+Kairouan,+4°C (2100),71.0
+Bizerte,+4°C (2100),69.9
+Gabès,+4°C (2100),69.4
+Ariana,+4°C (2100),71.2
+Gafsa,+4°C (2100),68.9
+Monastir,+4°C (2100),69.4
+Nabeul,+4°C (2100),75.5
+Béja,+4°C (2100),63.7
+Jendouba,+4°C (2100),60.5
+Tozeur,+4°C (2100),62.0
+Médenine,+4°C (2100),64.1
+Kasserine,+4°C (2100),69.5
+Mahdia,+4°C (2100),69.5
+Ben Arous,+4°C (2100),75.1
+Siliana,+4°C (2100),70.2
+Le Kef,+4°C (2100),53.4
+Hammamet,+4°C (2100),75.4
+Zaghouan,+4°C (2100),70.4
+Kebili,+4°C (2100),64.1
+Sidi Bouzid,+4°C (2100),71.4
+Tataouine,+4°C (2100),57.5
