@@ -6,6 +6,22 @@ const API_BASE =
   process.env.REACT_APP_API_URL ||
   'http://localhost:8000/api';
 
+const isAccessToken = (token) => {
+  if (typeof token !== 'string' || token.trim().length === 0) return false;
+
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+
+  try {
+    const payload = JSON.parse(
+      atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
+    );
+    return payload?.token_type === 'access';
+  } catch {
+    return false;
+  }
+};
+
 const api = axios.create({
   baseURL: API_BASE,
   headers: { 'Content-Type': 'application/json' },
@@ -14,8 +30,11 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const accessToken = localStorage.getItem('access_token');
-  if (accessToken) {
+  if (isAccessToken(accessToken)) {
     config.headers.Authorization = `Bearer ${accessToken}`;
+  } else if (accessToken) {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
   }
   return config;
 });

@@ -3,7 +3,7 @@ from django.conf import settings
 
 
 class ValuationRequest(models.Model):
-    """Persisted valuation request + AI response (user history)."""
+    """Persisted valuation request and valuation response history."""
 
     PROPERTY_TYPES = [
         ('apartment', 'Apartment'), ('house', 'House'), ('villa', 'Villa'),
@@ -47,7 +47,7 @@ class ValuationRequest(models.Model):
     prediction_mode  = models.CharField(max_length=50, default='heuristic')
     response_data    = models.JSONField(default=dict)
 
-    # Climate intelligence
+    # Climate signals
     climate_risk_category   = models.CharField(max_length=15, blank=True)
     climate_adjustment_pct  = models.FloatField(null=True, blank=True)
     climate_adjusted_price  = models.FloatField(null=True, blank=True)

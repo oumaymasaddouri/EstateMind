@@ -1,14 +1,24 @@
 """
-AI narrative explanation builder.
+Model-aware explanation builder for valuation responses.
 """
 
 
-def build(data: dict, prediction: dict, confidence: dict, comparables: list, market: dict,
-          text_analysis: dict, shap_result: dict) -> str:
-    """Return a human-readable AI explanation string."""
+def build(
+    data: dict,
+    prediction: dict,
+    confidence: dict,
+    comparables: list,
+    market: dict,
+    text_analysis: dict,
+    shap_result: dict,
+    image_analysis: dict | None = None,
+) -> str:
+    """Return a human-readable explanation string grounded in the active models."""
     lines = []
 
     prop_type    = (data.get('property_type') or 'property').title()
+    model_type   = (data.get('model_property_type') or prediction.get('model_info', {}).get('property_scope') or data.get('property_type') or 'property')
+    model_type   = str(model_type).strip()
     size_m2      = data.get('size_m2')
     governorate  = data.get('governorate') or 'Tunisia'
     city         = data.get('city') or ''
@@ -20,6 +30,14 @@ def build(data: dict, prediction: dict, confidence: dict, comparables: list, mar
     conf_level   = confidence.get('confidence_level', 'Medium')
     conf_score   = confidence.get('confidence', 50)
     mode         = prediction.get('prediction_mode', 'heuristic')
+
+    mapped_from = data.get('property_type') or 'property'
+    mapped_to = model_type or mapped_from
+
+    # Sentence 0 — model mapping
+    lines.append(
+        f"The request was normalized from **{mapped_from}** to **{mapped_to}** so the valuation can use the matching serving bundle."
+    )
 
     # Sentence 1 — main estimate
     loc_str = f"{city}, {governorate}" if city else governorate
@@ -77,24 +95,40 @@ def build(data: dict, prediction: dict, confidence: dict, comparables: list, mar
             "the estimate relies fully on market priors for this area."
         )
 
-    # Sentence 5 — text quality
+    # Sentence 5 — text and image signals
     tq = text_analysis.get('description_quality', '')
     if tq and tq != 'None':
-        sentiment = text_analysis.get('sentiment_label', 'neutral')
+        sentiment = text_analysis.get('description_sentiment_label', text_analysis.get('sentiment_label', 'neutral'))
+        sentiment_mode = text_analysis.get('sentiment_mode', 'not_used')
         lines.append(
-            f"Your description is **{tq.lower()}** quality with a {sentiment} tone, "
-            f"which {'supports' if sentiment == 'positive' else 'may slightly impact'} perceived listing value."
+            f"The description signal is **{tq.lower()}** quality with a {sentiment} tone from the {sentiment_mode} text model, "
+            f"which {'supports' if sentiment == 'positive' else 'keeps the narrative conservative for'} the listing value."
         )
+
+    if image_analysis:
+        cv_mode = image_analysis.get('cv_mode', 'not_used')
+        image_count = int(image_analysis.get('image_count', 0) or 0)
+        if image_count > 0:
+            predicted_type = image_analysis.get('property_type_predicted', 'unknown')
+            lines.append(
+                f"Uploaded imagery was processed by the {cv_mode} CV path across {image_count} image(s), "
+                f"with a predicted property type of {predicted_type}."
+            )
+        else:
+            lines.append("No images were uploaded, so the CV path did not contribute to this valuation.")
 
     # Sentence 6 — model note
     if mode == 'heuristic':
         lines.append(
-            "**Note:** This estimate uses calibrated market priors. "
-            "Upload property images and add a detailed description to improve accuracy."
+            "**Note:** This estimate uses calibrated market priors. Upload property images and add a detailed description to improve coverage."
         )
     elif mode == 'market_data':
         lines.append(
             "**Note:** This estimate is data-driven, using real Tunisian listing medians for this area."
+        )
+    elif mode.startswith(('catboost', 'fallback_model')):
+        lines.append(
+            "**Note:** The price engine is driven by the mapped CatBoost serving bundle, with fallback tabular models used only when needed."
         )
 
     # Sentence 7 — bounds

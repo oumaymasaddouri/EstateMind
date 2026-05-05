@@ -425,7 +425,7 @@ function MarketContext({ market }) {
   );
 }
 
-// ── AI Explanation text ───────────────────────────────────────────────────────
+// ── Model explanation text ───────────────────────────────────────────────────
 function Explanation({ text }) {
   if (!text) return null;
   const parts = text.split('**').map((s, i) =>
@@ -562,20 +562,6 @@ function Waterfall({ shap }) {
   );
 }
 
-// ── Warnings banner ───────────────────────────────────────────────────────────
-function Warnings({ items }) {
-  const all = (items||[]).filter(Boolean);
-  if (!all.length) return null;
-  return (
-    <div className="flex gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
-      <AlertTriangle size={15} className="mt-0.5 flex-shrink-0 text-amber-400" />
-      <div className="space-y-0.5">
-        {all.map((w,i) => <p key={i} className="text-xs text-amber-300">{w}</p>)}
-      </div>
-    </div>
-  );
-}
-
 // ── Scenario cards ────────────────────────────────────────────────────────────
 function ScenariosPanel({ scenarios, currency }) {
   if (!scenarios?.length) return (
@@ -624,7 +610,6 @@ function Results({ result, txType }) {
     { id:'impact',        l:'Price Drivers', I:BarChart2 },
     { id:'market',        l:'Market',        I:TrendingUp },
     { id:'scenarios',     l:'Scenarios',     I:Zap },
-    { id:'intelligence',  l:'Intelligence',  I:Brain },
   ];
   const currency   = txType === 'rent' ? 'TND/mo' : 'TND';
   const priceLabel = txType === 'rent' ? 'Monthly Rent Estimate' : 'Estimated Market Value';
@@ -674,8 +659,6 @@ function Results({ result, txType }) {
         </div>
       </div>
 
-      <Warnings items={[...(result.warnings||[]), ...(result.uncertainty_reasons||[])]} />
-
       {/* Tab bar */}
       <div className="flex gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
         {TABS.map(({ id, l, I }) => (
@@ -693,7 +676,7 @@ function Results({ result, txType }) {
 
           {tab === 'overview' && (
             <div className="space-y-4">
-              <Card title="AI Explanation" icon={Brain}>
+              <Card title="Model Explanation" icon={Info}>
                 <Explanation text={result.ai_explanation} />
               </Card>
               <Card title="Confidence Signal Breakdown" icon={Activity}>
@@ -749,46 +732,7 @@ function Results({ result, txType }) {
             </div>
           )}
 
-          {tab === 'intelligence' && (
-            <div className="space-y-4">
-              <Card title="Model & Pipeline Info" icon={Info}>
-                <div className="space-y-2 text-sm">
-                  {[
-                    { k:'Prediction Mode',  v:result.prediction_mode },
-                    { k:'Sentiment Mode',   v:result.sentiment_mode },
-                    { k:'CV Mode',          v:result.cv_mode },
-                    { k:'Explanation Mode', v:result.explanation_mode },
-                    { k:'Uncertainty Mode', v:result.uncertainty_mode },
-                    { k:'Model Version',    v:result.model_info?.version },
-                  ].map(({ k, v }) => (
-                    <div key={k} className="flex justify-between border-b border-white/5 pb-1.5">
-                      <span className="text-gray-500">{k}</span>
-                      <span className="font-mono text-gray-200">{v||'—'}</span>
-                    </div>
-                  ))}
-                  {result.model_info?.note && (
-                    <div className="mt-2 rounded-lg border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-xs text-blue-300">
-                      {result.model_info.note}
-                    </div>
-                  )}
-                </div>
-              </Card>
-              <Card title="Vision / Image Analysis" icon={Eye}>
-                <ImageAnalysis ia={result.image_analysis} />
-              </Card>
-              {result.uncertainty_reasons?.length > 0 && (
-                <Card title="Uncertainty Reasons" icon={AlertCircle}>
-                  <ul className="space-y-1.5">
-                    {result.uncertainty_reasons.map((r,i) => (
-                      <li key={i} className="flex gap-2 text-xs text-gray-400">
-                        <AlertCircle size={12} className="mt-0.5 flex-shrink-0 text-amber-400" />{r}
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
-              )}
-            </div>
-          )}
+          {/* 'Model' tab removed — only Overview, Price Drivers, Market, Scenarios remain */}
 
         </motion.div>
       </AnimatePresence>
@@ -1110,8 +1054,8 @@ function InformationalMode() {
       <div className="grid gap-4 sm:grid-cols-2">
         {[
           { icon:'🏠', title:'Property Profiling',      desc:'Type, size, condition, and features are analysed to build a complete picture of your property.' },
-          { icon:'📍', title:'Neighbourhood Intelligence', desc:'Prices are calibrated at the neighbourhood level across all 278 areas in Tunisia using real market data.' },
-          { icon:'🧠', title:'AI Estimation',           desc:'Our AI model delivers estimates with up to 94% accuracy. Listing descriptions are also analysed to refine the result.' },
+          { icon:'📍', title:'Neighbourhood Pricing', desc:'Prices are calibrated at the neighbourhood level across all 278 areas in Tunisia using real market data.' },
+          { icon:'🧠', title:'Model Estimation',        desc:'Our model delivers estimates with up to 94% accuracy. Listing descriptions are also analysed to refine the result.' },
           { icon:'📊', title:'Confidence Score',        desc:'A 0–100 score reflects how much data backs the estimate — photos, description, and comparable listings all count.' },
         ].map(s => (
           <div key={s.title} className="rounded-2xl border border-white/10 bg-white/5 p-5">

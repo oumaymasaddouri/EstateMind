@@ -46,7 +46,7 @@ def build(
 
         # Explainability
         'ai_explanation':  ai_explanation,
-        'explanation_mode': 'true_shap' if prediction.get('prediction_mode', '').startswith('catboost') else 'heuristic_attribution',
+        'explanation_mode': 'model_based' if prediction.get('prediction_mode', '').startswith(('catboost', 'fallback_model')) else 'rule_based',
 
         # Text & Vision analysis
         'text_analysis':  text_analysis,
@@ -68,9 +68,9 @@ def build(
             'mode':    prediction.get('prediction_mode', 'heuristic'),
             'version': '2.0.0',
             'note':    (
-                'Powered by real market data from Tunisian listings.'
-                if prediction.get('prediction_mode') == 'market_data'
-                else 'Using calibrated market priors — add more details to improve accuracy.'
+                'Powered by trained valuation models and local market priors.'
+                if prediction.get('prediction_mode', '').startswith(('catboost', 'fallback_model'))
+                else 'Using calibrated market priors.'
             ),
         },
 

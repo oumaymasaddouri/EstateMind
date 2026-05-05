@@ -5,6 +5,22 @@ import { trackUserActivity, createCheckoutSession, devUpgradePlan } from '../ser
 
 const AuthContext = createContext();
 
+const isAccessToken = (token) => {
+  if (typeof token !== 'string' || token.trim().length === 0) return false;
+
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+
+  try {
+    const payload = JSON.parse(
+      atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
+    );
+    return payload?.token_type === 'access';
+  } catch {
+    return false;
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,8 +36,15 @@ export const AuthProvider = ({ children }) => {
   // Initialize auth on mount
   useEffect(() => {
     const token = localStorage.getItem('access_token');
-    if (token) {
+    if (isAccessToken(token)) {
       verifyToken(token);
+    } else if (token) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      setToken(null);
+      setRefreshToken(null);
+      setUser(null);
+      setLoading(false);
     } else {
       setLoading(false);
     }

@@ -1,86 +1,92 @@
 """
-Feature attribution service — heuristic SHAP-like waterfall.
-Ranks feature contributions and emits frontend-ready impact list + waterfall.
+Price driver service for valuation responses.
+
+The bundled models do not expose native SHAP values at serve time, so this
+service derives stable, model-aware drivers from the current request, the
+predicted price, and the available market context.
 """
-import math
+
+from __future__ import annotations
+
+from typing import Any
 
 
-# Human-readable feature labels
-_LABELS = {
-    'location':            'Location',
-    'size':                'Property Size',
-    'condition':           'Condition',
-    'bedrooms':            'Bedroom Layout',
-    'Swimming Pool':       'Swimming Pool',
-    'Garden':              'Garden',
-    'Parking':             'Parking',
-    'Sea View':            'Sea View',
-    'Elevator':            'Elevator',
-    'description_quality': 'Description Quality',
-}
+def _impact(feature: str, label: str, value: float, estimated_price: float, positive: bool = True) -> dict[str, Any]:
+    percent = abs(value) / max(float(estimated_price), 1.0) * 100.0
+    return {
+        'feature': label,
+        'impact': round(abs(value)),
+        'direction': 'positive' if positive else 'negative',
+        'percent': round(percent, 1),
+        'raw_feature': feature,
+    }
 
 
-def explain(data: dict, prediction: dict) -> dict:
+def explain(data: dict, prediction: dict, market_context: dict | None = None, text_analysis: dict | None = None) -> dict:
     """
-    Returns dict with:
-      features_impact — sorted list of {feature, impact, direction, percent}
-      shap            — {baseline, contributions, predicted}
+    Return frontend-ready price drivers and a simple waterfall summary.
     """
-    contributions: dict = prediction.get('contributions', {})
-    estimated_price  = float(prediction.get('estimated_price', 0))
-    base_total       = float(prediction.get('base_total', estimated_price * 0.60))
+    estimated_price = float(prediction.get('estimated_price', 0) or 0)
+    market_context = market_context or {}
+    text_analysis = text_analysis or {}
 
-    if not contributions:
-        return _fallback(data, estimated_price, base_total)
+    drivers: list[dict[str, Any]] = []
 
-    # Filter near-zero contributions
-    significant = {k: v for k, v in contributions.items() if abs(v) > estimated_price * 0.001}
+    size_m2 = float(data.get('size_m2') or 0)
+    if size_m2 > 0:
+        size_value = size_m2 * max(float(prediction.get('price_per_m2', 0) or market_context.get('avg_price_per_m2') or 1450), 1.0)
+        drivers.append(_impact('size_m2', 'Property Size', size_value * 0.12, estimated_price, True))
 
-    # Sort by absolute magnitude
-    ranked = sorted(significant.items(), key=lambda kv: abs(kv[1]), reverse=True)
+    governorate = str(data.get('governorate') or '').strip()
+    avg_ppm2 = float(market_context.get('avg_price_per_m2') or 0)
+    if governorate and avg_ppm2:
+        drivers.append(_impact('location', 'Location', avg_ppm2 * max(size_m2, 1.0) * 0.10, estimated_price, True))
 
-    features_impact = []
-    waterfall_items = []
-    running = base_total
+    condition = str(data.get('condition') or '').strip().lower()
+    if condition in {'excellent', 'new'}:
+        drivers.append(_impact('condition', 'Condition', estimated_price * 0.08, estimated_price, True))
+    elif condition in {'needs renovation', 'poor'}:
+        drivers.append(_impact('condition', 'Condition', estimated_price * 0.07, estimated_price, False))
 
-    for feat, val in ranked[:8]:
-        label = _LABELS.get(feat, feat.replace('_', ' ').title())
-        direction = 'positive' if val >= 0 else 'negative'
-        pct = abs(val) / max(estimated_price, 1) * 100
-        features_impact.append({
-            'feature':   label,
-            'impact':    round(abs(val)),
-            'direction': direction,
-            'percent':   round(pct, 1),
-        })
-        running += val
+    if bool(data.get('sea_view')):
+        drivers.append(_impact('sea_view', 'Sea View', estimated_price * 0.06, estimated_price, True))
+    if bool(data.get('has_pool')):
+        drivers.append(_impact('has_pool', 'Swimming Pool', estimated_price * 0.05, estimated_price, True))
+    if bool(data.get('has_garden')):
+        drivers.append(_impact('has_garden', 'Garden', estimated_price * 0.03, estimated_price, True))
+    if bool(data.get('has_parking')):
+        drivers.append(_impact('has_parking', 'Parking', estimated_price * 0.025, estimated_price, True))
+    if bool(data.get('elevator')):
+        drivers.append(_impact('elevator', 'Elevator', estimated_price * 0.02, estimated_price, True))
+
+    description_score = float(text_analysis.get('description_score', 0) or 0)
+    if description_score > 0:
+        drivers.append(_impact('description_quality', 'Description Quality', estimated_price * (0.02 + description_score * 0.04), estimated_price, True))
+
+    comparable_count = int(market_context.get('comparable_count', 0) or 0)
+    if comparable_count:
+        drivers.append(_impact('comparables', 'Comparable Listings', estimated_price * min(comparable_count / 20.0, 0.05), estimated_price, True))
+
+    if not drivers:
+        drivers.append(_impact('property_type', 'Property Type', estimated_price * 0.10, estimated_price, True))
+
+    ranked = sorted(drivers, key=lambda item: item['impact'], reverse=True)[:8]
+    running = round(estimated_price * 0.60)
+    waterfall_items: list[dict[str, Any]] = []
+    for driver in ranked:
+        delta = driver['impact'] if driver['direction'] == 'positive' else -driver['impact']
+        running += delta
         waterfall_items.append({
-            'feature': label,
-            'delta':   round(val),
+            'feature': driver['feature'],
+            'delta': round(delta),
             'running': round(running),
         })
 
     return {
-        'features_impact': features_impact,
+        'features_impact': ranked,
         'shap': {
-            'baseline':      round(base_total),
+            'baseline': round(estimated_price * 0.60),
             'contributions': waterfall_items,
-            'predicted':     round(estimated_price),
-        },
-    }
-
-
-def _fallback(data: dict, estimated_price: float, base_total: float) -> dict:
-    """Minimal attribution when contributions dict is empty."""
-    size_m2 = float(data.get('size_m2') or 100)
-    impacts = [
-        {'feature': 'Property Size', 'impact': round(size_m2 * 1_800 * 0.1), 'direction': 'positive', 'percent': 10.0},
-    ]
-    return {
-        'features_impact': impacts,
-        'shap': {
-            'baseline':      round(base_total),
-            'contributions': [{'feature': 'Property Size', 'delta': round(size_m2 * 1_800 * 0.1), 'running': round(estimated_price)}],
-            'predicted':     round(estimated_price),
+            'predicted': round(estimated_price),
         },
     }
