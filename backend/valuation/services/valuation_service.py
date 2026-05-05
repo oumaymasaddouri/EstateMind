@@ -149,7 +149,7 @@ def estimate(data: dict, image_files: list | None = None) -> dict:
     comps, market_ctx = comparables.find(data, prediction['estimated_price'])
 
     # 5 ── Price drivers, confidence scoring, and scenarios
-    shap_result = shap_service.explain(data, prediction, market_ctx, text_analysis)
+    shap_result = shap_service.explain(data, prediction)
     conf_result = confidence.compute(data, prediction, comps, image_files)
     scenarios, recommendations = scenario_service.generate(
         data,
