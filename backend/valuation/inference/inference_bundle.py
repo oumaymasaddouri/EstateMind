@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
 
 REFERENCE_DATASET_CANDIDATES = (
+    Path("backend/valuation/repo_clone/data/csv/preprocessed/final_listings_preprocessed.csv"),
     Path("frontend/repo_clone/data/csv/preprocessed/final_listings_preprocessed.csv"),
     Path("data/csv/preprocessed/final_listings_preprocessed.csv"),
     Path("data/csv/final_listings_preprocessed.csv"),

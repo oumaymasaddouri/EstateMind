@@ -809,6 +809,7 @@ function FunctionalMode() {
 
       const res = await api.post('/valuations/predict/', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000,
       });
       setResult(res.data);
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);

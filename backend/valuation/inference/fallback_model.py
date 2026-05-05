@@ -25,7 +25,7 @@ class FallbackPrediction:
 class FallbackTabularModelService:
     def __init__(self, artifacts_dir: str | Path | None = None) -> None:
         root = Path(__file__).resolve().parents[3]
-        self.artifacts_dir = Path(artifacts_dir) if artifacts_dir else root / "frontend" / "repo_clone" / "artifacts" / "models" / "fallback_tabular"
+        self.artifacts_dir = Path(artifacts_dir) if artifacts_dir else root / "backend" / "valuation" / "artifacts" / "models" / "fallback_tabular"
         self.manifest_path = self.artifacts_dir / "manifest.json"
         self._manifest: dict[str, Any] | None = None
         self._models: dict[str, Any] = {}

@@ -9,6 +9,7 @@ from ..inference.model_registry import ModelRegistry
 from ..inference.request_mapper import map_request
 from ..inference.cv_model import CVModelService
 from ..inference.sentiment_model import SentimentModelService
+from . import nlp_service
 
 logger = logging.getLogger(__name__)
 
@@ -114,12 +115,15 @@ def estimate(data: dict, image_files: list | None = None) -> dict:
         description = data.get('description', '')
         sentiment_prediction = sentiment_service.analyze_description(description)
         if sentiment_prediction:
+            location_sentiment = nlp_service.analyze_location(data.get('city', ''), data.get('governorate', ''))
             text_analysis = {
                 'description_quality': sentiment_prediction.description_quality,
                 'description_sentiment': sentiment_prediction.sentiment_score,
                 'description_sentiment_label': sentiment_prediction.sentiment_label,
-                'location_sentiment': 0.5,  # Placeholder for future location sentiment
-                'location_sentiment_label': 'neutral',
+                'sentiment_score': sentiment_prediction.sentiment_score,
+                'sentiment_label': sentiment_prediction.sentiment_label,
+                'location_sentiment': location_sentiment,
+                'location_sentiment_label': location_sentiment.get('label', 'neutral'),
                 'marketing_effectiveness': 'Evaluated' if description else 'Not evaluated',
                 'key_phrases': sentiment_prediction.key_phrases,
                 'token_count': sentiment_prediction.token_count,
@@ -131,12 +135,15 @@ def estimate(data: dict, image_files: list | None = None) -> dict:
         logger.warning("Sentiment analysis failed: %s", exc)
     
     if not text_analysis:
+        location_sentiment = nlp_service.analyze_location(data.get('city', ''), data.get('governorate', ''))
         text_analysis = {
             'description_quality': 'Not evaluated',
             'description_sentiment': 0.5,
             'description_sentiment_label': 'neutral',
-            'location_sentiment': 0.5,
-            'location_sentiment_label': 'neutral',
+            'sentiment_score': 0.5,
+            'sentiment_label': 'neutral',
+            'location_sentiment': location_sentiment,
+            'location_sentiment_label': location_sentiment.get('label', 'neutral'),
             'marketing_effectiveness': 'Not evaluated',
             'key_phrases': [],
             'token_count': 0,

@@ -80,6 +80,8 @@ class ModelRegistry:
     def _discover_handles(self) -> list[ModelHandle]:
         handles: list[ModelHandle] = []
         artifact_roots = [
+            self.root / "backend" / "valuation" / "artifacts" / "models" / "models_estateprocessor",
+            self.root / "backend" / "valuation" / "artifacts" / "models_estateprocessor",
             self.root / "frontend" / "repo_clone" / "artifacts" / "models" / "models_estateprocessor",
             self.root / "artifacts" / "models" / "models_estateprocessor",
         ]

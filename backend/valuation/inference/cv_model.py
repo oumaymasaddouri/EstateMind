@@ -48,7 +48,7 @@ class CVModelService:
 
     def __init__(self, artifacts_dir: str | Path | None = None) -> None:
         root = Path(__file__).resolve().parents[3]
-        self.artifacts_dir = Path(artifacts_dir) if artifacts_dir else root / "frontend" / "repo_clone" / "artifacts" / "models"
+        self.artifacts_dir = Path(artifacts_dir) if artifacts_dir else root / "backend" / "valuation" / "artifacts" / "models"
         self.model_path = self.artifacts_dir / "image_property_type_fallback.pt"
         self.labels_path = self.artifacts_dir / "image_property_type_fallback.labels.json"
         
