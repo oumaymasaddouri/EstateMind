@@ -1,0 +1,39 @@
+[AutoScraper] Background scheduler started — interval: 24 hours
+Watching for file changes with StatReloader
+[05/May/2026 12:29:27] "GET /healthz HTTP/1.1" 200 16
+[05/May/2026 12:29:27,541] - Broken pipe from ('127.0.0.1', 49684)
+[05/May/2026 12:29:35] "GET /healthz HTTP/1.1" 200 16
+[05/May/2026 12:29:35,324] - Broken pipe from ('127.0.0.1', 49686)
+[AutoScraper] Starting scheduled 24h scrape run
+[mubawab] Discovered 72 URLs, scraping now…
+[mubawab] Progress: 10/72 scraped
+[mubawab] Progress: 20/72 scraped
+[mubawab] Progress: 30/72 scraped
+[mubawab] Progress: 40/72 scraped
+[mubawab] Progress: 50/72 scraped
+[mubawab] Progress: 60/72 scraped
+[mubawab] Progress: 70/72 scraped
+[mubawab] Done — 72 records collected
+HTTP 404 on https://www.tecnocasa.tn/vendre/appartements/nord-est-ne/grand-tunis.html — aborting
+HTTP 404 on https://www.tecnocasa.tn/vendre/maisons-villas/nord-est-ne/grand-tunis.html — aborting
+HTTP 404 on https://www.tecnocasa.tn/vendre/terrains/nord-est-ne/grand-tunis.html — aborting
+HTTP 404 on https://www.tecnocasa.tn/louer/appartements/nord-est-ne/grand-tunis.html — aborting
+[tecnocasa] Discovered 60 URLs, scraping now…
+[tecnocasa] Progress: 10/60 scraped
+[tecnocasa] Progress: 20/60 scraped
+[tecnocasa] Progress: 30/60 scraped
+[tecnocasa] Progress: 40/60 scraped
+[tecnocasa] Progress: 50/60 scraped
+[tecnocasa] Progress: 60/60 scraped
+[tecnocasa] Done — 3 records collected
+[tunisie_annonce] Discovered 80 URLs, scraping now…
+[tunisie_annonce] Progress: 10/80 scraped
+[tunisie_annonce] Progress: 20/80 scraped
+[tunisie_annonce] Progress: 30/80 scraped
+[tunisie_annonce] Progress: 40/80 scraped
+[tunisie_annonce] Progress: 50/80 scraped
+[tunisie_annonce] Progress: 60/80 scraped
+[tunisie_annonce] Progress: 70/80 scraped
+[tunisie_annonce] Progress: 80/80 scraped
+[tunisie_annonce] Done — 46 records collected
+[AutoScraper] Scheduled run complete — next run in 24 hours
