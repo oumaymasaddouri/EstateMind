@@ -8,7 +8,7 @@ import axios from 'axios';
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 // Inner payment form component
-function PaymentForm({ clientSecret, plan, onSuccess, onClose, userEmail }) {
+function PaymentForm({ clientSecret, plan, onSuccess, onClose, userEmail, userFullName, userPhone }) {
   const stripe = useStripe();
   const elements = useElements();
   const [isLoading, setIsLoading] = useState(false);
@@ -28,11 +28,21 @@ function PaymentForm({ clientSecret, plan, onSuccess, onClose, userEmail }) {
     setMessage(null);
 
     try {
-      // Confirm the payment - Payment Element handles all billing details
+      // Confirm the payment while sending the billing data Stripe requires.
       const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
         elements,
         redirect: 'if_required',
         confirmParams: {
+          payment_method_data: {
+            billing_details: {
+              name: userFullName || userEmail || 'EstateMind Customer',
+              email: userEmail || '',
+              phone: userPhone || undefined,
+              address: {
+                country: 'TN',
+              },
+            },
+          },
           return_url: `${window.location.origin}/account/dashboard`,
         },
       });
@@ -98,7 +108,7 @@ function PaymentForm({ clientSecret, plan, onSuccess, onClose, userEmail }) {
             },
           },
           fields: {
-            billingDetails: 'auto',
+            billingDetails: 'never',
           },
           terms: {
             card: 'auto',
@@ -139,7 +149,16 @@ function PaymentForm({ clientSecret, plan, onSuccess, onClose, userEmail }) {
 }
 
 // Main modal component
-export default function PaymentModal({ isOpen, onClose, clientSecret, plan, onSuccess, userEmail }) {
+export default function PaymentModal({
+  isOpen,
+  onClose,
+  clientSecret,
+  plan,
+  onSuccess,
+  userEmail,
+  userFullName,
+  userPhone,
+}) {
   if (!isOpen) return null;
 
   const options = {
@@ -195,6 +214,8 @@ export default function PaymentModal({ isOpen, onClose, clientSecret, plan, onSu
                 onSuccess={onSuccess}
                 onClose={onClose}
                 userEmail={userEmail}
+                userFullName={userFullName}
+                userPhone={userPhone}
               />
             </Elements>
           ) : (

@@ -234,6 +234,8 @@ export default function AccountDashboardPage() {
         plan={selectedPlan}
         onSuccess={handlePaymentSuccess}
         userEmail={user?.email}
+              userFullName={user?.full_name || ''}
+              userPhone={user?.phone || ''}
       />
     </main>
   );
