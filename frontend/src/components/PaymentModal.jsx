@@ -42,6 +42,7 @@ function PaymentForm({ clientSecret, plan, onSuccess, onClose, userEmail }) {
           payment_method_data: {
             billing_details: {
               name: fullName.trim(),
+              email: userEmail || '',
             },
           },
         },
