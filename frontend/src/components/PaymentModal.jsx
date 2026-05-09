@@ -94,6 +94,9 @@ function PaymentForm({ clientSecret, plan, onSuccess, onClose, userEmail }) {
               email: userEmail || '',
             },
           },
+          fields: {
+            billingDetails: 'never',
+          },
         }}
       />
 
@@ -170,7 +173,7 @@ export default function PaymentModal({ isOpen, onClose, clientSecret, plan, onSu
         </div>
 
         {/* Body */}
-        <div className="p-6">
+        <div className="p-6 max-h-[calc(100vh-200px)] overflow-y-auto">
           {/* Plan Info */}
           <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
             <p className="text-sm text-gray-600">Plan Amount</p>
