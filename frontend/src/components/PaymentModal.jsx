@@ -15,6 +15,7 @@ function PaymentForm({ clientSecret, plan, onSuccess, onClose, userEmail }) {
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,6 +44,7 @@ function PaymentForm({ clientSecret, plan, onSuccess, onClose, userEmail }) {
             billing_details: {
               name: fullName.trim(),
               email: userEmail || '',
+              phone: phone.trim() || null,
             },
           },
         },
@@ -107,6 +109,18 @@ function PaymentForm({ clientSecret, plan, onSuccess, onClose, userEmail }) {
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           placeholder="Enter your full name"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          disabled={isLoading}
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+        <input
+          type="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="Enter your phone number"
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           disabled={isLoading}
         />
