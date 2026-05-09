@@ -14,6 +14,7 @@ function PaymentForm({ clientSecret, plan, onSuccess, onClose, userEmail }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
+  const [fullName, setFullName] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,15 +24,27 @@ function PaymentForm({ clientSecret, plan, onSuccess, onClose, userEmail }) {
       return;
     }
 
+    if (!fullName.trim()) {
+      setError('Please enter your full name');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setMessage(null);
 
     try {
-      // Confirm the payment
+      // Confirm the payment with billing details
       const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
         elements,
         redirect: 'if_required',
+        confirmParams: {
+          payment_method_data: {
+            billing_details: {
+              name: fullName.trim(),
+            },
+          },
+        },
       });
 
       if (confirmError) {
@@ -86,6 +99,18 @@ function PaymentForm({ clientSecret, plan, onSuccess, onClose, userEmail }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+        <input
+          type="text"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          placeholder="Enter your full name"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          disabled={isLoading}
+        />
+      </div>
+
       <PaymentElement
         options={{
           layout: 'tabs',
