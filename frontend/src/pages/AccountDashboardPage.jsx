@@ -10,9 +10,9 @@ const INP = 'w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 te
   'placeholder:text-gray-600 focus:outline-none focus:border-[#FF6B35]/60 focus:ring-1 focus:ring-[#FF6B35]/30';
 
 const PLAN_META = {
-  free: { label: 'Free', price: '0 TND/month' },
-  pro: { label: 'Pro', price: '250 TND/month' },
-  investor: { label: 'Investor', price: '500 TND/month' },
+  free: { label: 'Free', price: 'Free' },
+  pro: { label: 'Pro', price: '$25.00/month' },
+  investor: { label: 'Investor', price: '$50.00/month' },
 };
 
 export default function AccountDashboardPage() {

@@ -49,15 +49,15 @@ class BillingViewSet(viewsets.ViewSet):
         # Define pricing for each plan
         prices = {
             'pro': {
-                'amount': 25000,  # 250 TND in cents (Stripe expects cents)
-                'currency': 'tnd',
-                'description': 'Pro Plan - 250 TND/month',
+                'amount': 2500,  # $25.00 USD
+                'currency': 'usd',
+                'description': 'Pro Plan - $25.00/month',
                 'product': 'EstateMind Pro Plan'
             },
             'investor': {
-                'amount': 50000,  # 500 TND in cents
-                'currency': 'tnd',
-                'description': 'Investor Plan - 500 TND/month',
+                'amount': 5000,  # $50.00 USD
+                'currency': 'usd',
+                'description': 'Investor Plan - $50.00/month',
                 'product': 'EstateMind Investor Plan'
             }
         }

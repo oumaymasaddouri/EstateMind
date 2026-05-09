@@ -144,8 +144,8 @@ export default function PaymentModal({ isOpen, onClose, clientSecret, plan, onSu
   };
 
   const planPrices = {
-    pro: { amount: 25000, currency: 'tnd', display: '250 TND/month' },
-    investor: { amount: 50000, currency: 'tnd', display: '500 TND/month' },
+    pro: { amount: 2500, currency: 'usd', display: '$25.00/month' },
+    investor: { amount: 5000, currency: 'usd', display: '$50.00/month' },
   };
 
   const currentPlan = planPrices[plan] || { amount: 0, currency: 'tnd', display: 'Custom' };
