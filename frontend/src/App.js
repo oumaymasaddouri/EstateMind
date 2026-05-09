@@ -27,12 +27,11 @@ import OpportunitiesPage from './pages/invest/OpportunitiesPage';
 import RiskPage from './pages/invest/RiskPage';
 import SimulatePage from './pages/SimulatePage';
 import AccountDashboardPage from './pages/AccountDashboardPage';
+import AccountSettingsPage from './pages/AccountSettingsPage';
+import AccountApiKeysPage from './pages/AccountApiKeysPage';
+import AccountAlertsPage from './pages/AccountAlertsPage';
 import NotFoundPage from './pages/NotFoundPage';
 import AIChatWidget from './components/AIChatWidget';
-
-function EmptyPage() {
-  return <main className="pt-20 min-h-[calc(100vh-200px)]" />;
-}
 
 function AppLayout() {
   const location = useLocation();
@@ -100,7 +99,7 @@ function AppLayout() {
             path="/account/settings"
             element={
               <ProtectedRoute>
-                <EmptyPage />
+                <AccountSettingsPage />
               </ProtectedRoute>
             }
           />
@@ -108,15 +107,7 @@ function AppLayout() {
             path="/account/api-keys"
             element={
               <ProtectedRoute>
-                <EmptyPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/account/saved"
-            element={
-              <ProtectedRoute>
-                <EmptyPage />
+                <AccountApiKeysPage />
               </ProtectedRoute>
             }
           />
@@ -124,7 +115,7 @@ function AppLayout() {
             path="/account/alerts"
             element={
               <ProtectedRoute>
-                <EmptyPage />
+                <AccountAlertsPage />
               </ProtectedRoute>
             }
           />

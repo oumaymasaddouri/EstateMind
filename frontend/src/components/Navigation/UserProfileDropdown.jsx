@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogOut, Settings, Key, Heart, Bell, Zap } from 'lucide-react';
+import { LogOut, Settings, Key, Bell, Zap } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
@@ -58,16 +58,8 @@ const UserProfileDropdown = ({ isOpen, onClose }) => {
             </Link>
           </div>
 
-          {/* Personal Data Section */}
+          {/* Notifications Section */}
           <div className="p-3 space-y-1 border-b border-white/10">
-            <Link
-              to="/account/saved"
-              className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-              onClick={onClose}
-            >
-              <Heart size={16} />
-              Saved Properties
-            </Link>
             <Link
               to="/account/alerts"
               className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
