@@ -113,7 +113,7 @@ class BillingViewSet(viewsets.ViewSet):
                     'subscription_type': 'monthly'
                 },
                 description=pricing['description'],
-                statement_descriptor=f"EstateMind {plan.upper()}"
+                statement_descriptor_suffix=plan.upper()
             )
 
             logger.info(f"Payment intent created for user {user.email}, plan {plan}, intent_id {intent.id}")
