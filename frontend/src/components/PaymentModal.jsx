@@ -37,7 +37,7 @@ function PaymentForm({ clientSecret, plan, onSuccess, onClose, userEmail, userFu
             billing_details: {
               name: userFullName || userEmail || 'EstateMind Customer',
               email: userEmail || '',
-              phone: userPhone || undefined,
+              phone: (userPhone || '').trim(),
               address: {
                 country: 'TN',
               },
