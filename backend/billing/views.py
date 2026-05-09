@@ -100,42 +100,32 @@ class BillingViewSet(viewsets.ViewSet):
                     stripe_customer.stripe_customer_id = stripe_cust.id
                     stripe_customer.save()
 
-            # Create checkout session with subscription
-            session = stripe.checkout.Session.create(
+            # Create PaymentIntent for embedded payment form
+            intent = stripe.PaymentIntent.create(
                 customer=stripe_customer.stripe_customer_id,
+                amount=pricing['amount'],
+                currency=pricing['currency'],
                 payment_method_types=['card'],
-                line_items=[
-                    {
-                        'price_data': {
-                            'currency': pricing['currency'],
-                            'product_data': {
-                                'name': pricing['product'],
-                                'description': pricing['description'],
-                            },
-                            'unit_amount': pricing['amount'],
-                            'recurring': {
-                                'interval': 'month',
-                            },
-                        },
-                        'quantity': 1,
-                    }
-                ],
-                mode='subscription',
-                success_url=f"{settings.FRONTEND_URL}/account/dashboard?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
-                cancel_url=f"{settings.FRONTEND_URL}/pricing?payment=canceled",
                 metadata={
                     'user_id': str(user.id),
                     'plan': plan,
-                    'email': user.email
-                }
+                    'email': user.email,
+                    'subscription_type': 'monthly'
+                },
+                description=pricing['description'],
+                statement_descriptor=f"EstateMind {plan.upper()}"
             )
 
-            logger.info(f"Checkout session created for user {user.email}, plan {plan}, session_id {session.id}")
+            logger.info(f"Payment intent created for user {user.email}, plan {plan}, intent_id {intent.id}")
 
             return Response(
                 {
-                    'checkout_url': session.url,
-                    'session_id': session.id
+                    'client_secret': intent.client_secret,
+                    'intent_id': intent.id,
+                    'amount': pricing['amount'],
+                    'currency': pricing['currency'],
+                    'plan': plan,
+                    'email': user.email
                 },
                 status=status.HTTP_200_OK
             )
@@ -180,6 +170,77 @@ class BillingViewSet(viewsets.ViewSet):
             logger.error(f"Unexpected error in create_checkout_session: {e}")
             return Response(
                 {'error': 'An unexpected error occurred. Please try again.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'], url_path='confirm-payment')
+    def confirm_payment(self, request):
+        """
+        Confirm payment after user completes Payment Element form.
+        
+        Request body:
+        {
+            "intent_id": "pi_xxxxx",
+            "plan": "pro" or "investor"
+        }
+        """
+        intent_id = request.data.get('intent_id')
+        plan = request.data.get('plan')
+        user = request.user
+
+        if not intent_id or not plan:
+            return Response(
+                {'error': 'Missing intent_id or plan'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Retrieve the payment intent to verify it's succeeded
+            intent = stripe.PaymentIntent.retrieve(intent_id)
+            
+            if intent.status != 'succeeded':
+                return Response(
+                    {'error': f'Payment not completed. Status: {intent.status}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Update user subscription
+            user.plan = plan
+            user.plan_expires_at = timezone.now() + timedelta(days=30)
+            user.save(update_fields=['plan', 'plan_expires_at'])
+
+            # Log the payment
+            Payment.objects.create(
+                user=user,
+                stripe_payment_id=intent.id,
+                amount=Decimal(intent.amount / 100),  # Convert from cents to currency amount
+                currency=intent.currency.upper(),
+                status='completed',
+                plan=plan
+            )
+
+            logger.info(f"Payment confirmed for user {user.email}, plan {plan}, intent_id {intent_id}")
+
+            return Response(
+                {
+                    'success': True,
+                    'plan': plan,
+                    'message': f'Successfully upgraded to {plan} plan',
+                    'plan_expires_at': user.plan_expires_at.isoformat()
+                },
+                status=status.HTTP_200_OK
+            )
+
+        except stripe.error.InvalidRequestError as e:
+            logger.error(f"Invalid payment intent: {e}")
+            return Response(
+                {'error': f'Invalid payment intent: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error confirming payment: {e}")
+            return Response(
+                {'error': 'Error confirming payment. Please try again.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

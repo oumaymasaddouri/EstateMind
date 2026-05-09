@@ -276,6 +276,20 @@ class UserViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
+    @action(detail=False, methods=['POST'], permission_classes=[IsAuthenticated], url_path='delete-account')
+    def delete_account(self, request):
+        """Delete the authenticated user account after password confirmation."""
+        password = request.data.get('password', '')
+        if not password:
+            return Response({'password': 'Password is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        if not user.check_password(password):
+            return Response({'password': 'Incorrect password'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.delete()
+        return Response({'message': 'Account deleted successfully'}, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['POST'], permission_classes=[IsAuthenticated], url_path='activity')
     def activity(self, request):
         """Track user activity for AI Activity Center."""

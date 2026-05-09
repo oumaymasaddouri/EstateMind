@@ -207,6 +207,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const deleteAccount = async (password) => {
+    setError(null);
+    try {
+      const response = await axios.post(
+        `${API_BASE}/auth/delete-account/`,
+        { password },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      logout();
+      return { success: true, message: response.data?.message || 'Account deleted' };
+    } catch (err) {
+      const errorMsg =
+        err.response?.data?.password ||
+        err.response?.data?.detail ||
+        'Account deletion failed';
+      setError(errorMsg);
+      throw err;
+    }
+  };
+
   const value = {
     user,
     loading,
@@ -224,6 +244,7 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     changePassword,
     updateProfile,
+    deleteAccount,
     trackActivity: async (activity_type, feature, metadata = {}) => {
       if (!token) return;
       try {

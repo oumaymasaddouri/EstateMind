@@ -1,0 +1,201 @@
+import React, { useState, useEffect } from 'react';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { X, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import axios from 'axios';
+
+// Initialize Stripe
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
+
+// Inner payment form component
+function PaymentForm({ clientSecret, plan, onSuccess, onClose, userEmail }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [message, setMessage] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!stripe || !elements) {
+      setError('Payment service is not loaded. Please refresh and try again.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      // Confirm the payment
+      const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        redirect: 'if_required',
+      });
+
+      if (confirmError) {
+        setError(confirmError.message);
+        setIsLoading(false);
+        return;
+      }
+
+      if (paymentIntent && paymentIntent.status === 'succeeded') {
+        // Payment succeeded, now confirm with our backend
+        try {
+          const token = localStorage.getItem('access_token');
+          const response = await axios.post(
+            `${process.env.REACT_APP_API_URL}/billing/confirm-payment/`,
+            {
+              intent_id: paymentIntent.id,
+              plan: plan,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+
+          if (response.data.success) {
+            setMessage('Payment successful! Your plan has been upgraded.');
+            setTimeout(() => {
+              onSuccess();
+            }, 2000);
+          } else {
+            setError(response.data.error || 'Failed to confirm payment');
+          }
+        } catch (backendError) {
+          console.error('Backend error:', backendError);
+          setError(
+            backendError.response?.data?.error ||
+            'Failed to process payment. Please contact support.'
+          );
+        }
+      } else if (paymentIntent && paymentIntent.status === 'requires_action') {
+        setError('Additional verification required. Please complete the authentication.');
+      }
+    } catch (err) {
+      console.error('Payment error:', err);
+      setError(err.message || 'An unexpected error occurred.');
+    }
+
+    setIsLoading(false);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <PaymentElement
+        options={{
+          layout: 'tabs',
+          defaultValues: {
+            billingDetails: {
+              email: userEmail || '',
+            },
+          },
+        }}
+      />
+
+      {error && (
+        <div className="flex gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <p className="text-red-700 text-sm">{error}</p>
+        </div>
+      )}
+
+      {message && (
+        <div className="flex gap-3 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+          <p className="text-green-700 text-sm">{message}</p>
+        </div>
+      )}
+
+      <button
+        disabled={isLoading || !stripe || !elements}
+        type="submit"
+        className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+      >
+        {isLoading ? (
+          <>
+            <Loader className="w-4 h-4 animate-spin" />
+            Processing Payment...
+          </>
+        ) : (
+          'Complete Payment'
+        )}
+      </button>
+    </form>
+  );
+}
+
+// Main modal component
+export default function PaymentModal({ isOpen, onClose, clientSecret, plan, onSuccess, userEmail }) {
+  if (!isOpen) return null;
+
+  const options = {
+    clientSecret: clientSecret,
+    appearance: {
+      theme: 'stripe',
+      variables: {
+        colorPrimary: '#2563eb',
+      },
+    },
+  };
+
+  const planPrices = {
+    pro: { amount: 25000, currency: 'tnd', display: '250 TND/month' },
+    investor: { amount: 50000, currency: 'tnd', display: '500 TND/month' },
+  };
+
+  const currentPlan = planPrices[plan] || { amount: 0, currency: 'tnd', display: 'Custom' };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Complete Your Payment</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Upgrade to <span className="font-semibold capitalize">{plan} Plan</span>
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6">
+          {/* Plan Info */}
+          <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+            <p className="text-sm text-gray-600">Plan Amount</p>
+            <p className="text-2xl font-bold text-blue-600 mt-1">{currentPlan.display}</p>
+          </div>
+
+          {/* Payment Form */}
+          {clientSecret ? (
+            <Elements stripe={stripePromise} options={options}>
+              <PaymentForm
+                clientSecret={clientSecret}
+                plan={plan}
+                onSuccess={onSuccess}
+                onClose={onClose}
+                userEmail={userEmail}
+              />
+            </Elements>
+          ) : (
+            <div className="text-center py-8">
+              <Loader className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-500">Loading payment form...</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
