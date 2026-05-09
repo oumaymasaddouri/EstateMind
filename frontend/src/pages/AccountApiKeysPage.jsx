@@ -59,9 +59,7 @@ export default function AccountApiKeysPage() {
   };
 
   const handleToggleVisibility = (id) => {
-    setApiKeys((prev) =>
-      prev.map((k) => (k.id === id ? { ...k, visibleSecret: !k.visibleSecret } : k))
-    );
+    setApiKeys((prev) => prev.map((k) => (k.id === id ? { ...k, visibleSecret: !k.visibleSecret } : k)));
   };
 
   const handleToggleScope = (scope) => {
@@ -121,21 +119,13 @@ export default function AccountApiKeysPage() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#0B0F19] via-[#1A2332] to-[#0B0F19] px-4 pb-16 pt-24">
       <div className="mx-auto max-w-5xl space-y-6">
-<<<<<<< HEAD
-=======
-        {/* Header */}
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
         <section className={CARD}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Key className="w-6 h-6 text-[#FF6B35]" />
               <div>
                 <h1 className="text-3xl font-black text-white">API Keys</h1>
-<<<<<<< HEAD
                 <p className="mt-1 text-sm text-gray-400">Manage credentials to integrate EstateMind with your platform</p>
-=======
-                <p className="text-sm text-gray-400 mt-1">Manage credentials to integrate EstateMind with your platform</p>
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
               </div>
             </div>
             <button
@@ -162,11 +152,7 @@ export default function AccountApiKeysPage() {
                   placeholder="e.g., Production Web Integration"
                   className={INP}
                 />
-<<<<<<< HEAD
                 <p className="mt-1 text-xs text-gray-500">A descriptive name to help you identify this key</p>
-=======
-                <p className="text-xs text-gray-500 mt-1">A descriptive name to help you identify this key</p>
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
               </div>
 
               <div>
@@ -176,24 +162,14 @@ export default function AccountApiKeysPage() {
                     <button
                       key={env}
                       onClick={() => setNewKeyConfig({ ...newKeyConfig, environment: env })}
-<<<<<<< HEAD
                       className={`rounded-lg border p-3 text-left transition-colors ${
-=======
-                      className={`p-3 rounded-lg border transition-colors text-left ${
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
                         newKeyConfig.environment === env
                           ? 'border-[#FF6B35] bg-[#FF6B35]/20 text-white'
                           : 'border-white/15 text-gray-400 hover:border-white/30'
                       }`}
                     >
                       <p className="font-semibold capitalize">{env}</p>
-<<<<<<< HEAD
-                      <p className="mt-1 text-xs">
-=======
-                      <p className="text-xs mt-1">
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
-                        {env === 'development' ? 'For testing and development' : 'For live production'}
-                      </p>
+                      <p className="mt-1 text-xs">{env === 'development' ? 'For testing and development' : 'For live production'}</p>
                     </button>
                   ))}
                 </div>
@@ -203,28 +179,16 @@ export default function AccountApiKeysPage() {
                 <label className="mb-3 block text-sm font-medium text-gray-300">Permissions (Scopes) *</label>
                 <div className="space-y-2">
                   {KEY_SCOPES.map((scope) => (
-<<<<<<< HEAD
                     <label key={scope.id} className="flex cursor-pointer items-start gap-3 rounded-lg p-3 transition-colors hover:bg-white/5">
-=======
-                    <label key={scope.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 cursor-pointer transition-colors">
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
                       <input
                         type="checkbox"
                         checked={newKeyConfig.scopes.includes(scope.id)}
                         onChange={() => handleToggleScope(scope.id)}
-<<<<<<< HEAD
                         className="mt-1 h-4 w-4 rounded accent-[#FF6B35]"
                       />
                       <div className="flex-1">
                         <p className="text-sm font-medium text-white">{scope.label}</p>
                         <p className="mt-0.5 text-xs text-gray-500">{scope.description}</p>
-=======
-                        className="w-4 h-4 rounded accent-[#FF6B35] mt-1"
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-white">{scope.label}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{scope.description}</p>
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
                       </div>
                     </label>
                   ))}
@@ -234,21 +198,13 @@ export default function AccountApiKeysPage() {
               <div className="flex gap-3 pt-3">
                 <button
                   onClick={handleCreateKey}
-<<<<<<< HEAD
                   className="rounded-lg bg-[#FF6B35] px-6 py-2.5 font-semibold text-white transition-colors hover:bg-[#E85C2C]"
-=======
-                  className="px-6 py-2.5 rounded-lg bg-[#FF6B35] text-white font-semibold hover:bg-[#E85C2C] transition-colors"
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
                 >
                   Create Key Pair
                 </button>
                 <button
                   onClick={() => setShowCreateForm(false)}
-<<<<<<< HEAD
                   className="rounded-lg border border-white/15 px-6 py-2.5 font-semibold text-white transition-colors hover:bg-white/5"
-=======
-                  className="px-6 py-2.5 rounded-lg border border-white/15 text-white font-semibold hover:bg-white/5 transition-colors"
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
                 >
                   Cancel
                 </button>
@@ -257,10 +213,6 @@ export default function AccountApiKeysPage() {
           </section>
         )}
 
-<<<<<<< HEAD
-=======
-        {/* API Keys List */}
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
         <div className="space-y-4">
           {apiKeys.length === 0 ? (
             <section className={CARD}>
@@ -269,19 +221,11 @@ export default function AccountApiKeysPage() {
           ) : (
             apiKeys.map((apiKey) => (
               <section key={apiKey.id} className={CARD}>
-<<<<<<< HEAD
                 <div className="mb-4 flex items-start justify-between">
                   <div className="flex-1">
                     <div className="mb-1 flex items-center gap-2">
                       <h3 className="text-lg font-semibold text-white">{apiKey.name}</h3>
                       <span className={`rounded px-2 py-1 text-xs font-medium ${
-=======
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-lg font-semibold text-white">{apiKey.name}</h3>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
                         apiKey.environment === 'production'
                           ? 'bg-red-500/20 text-red-300'
                           : 'bg-blue-500/20 text-blue-300'
@@ -289,44 +233,28 @@ export default function AccountApiKeysPage() {
                         {apiKey.environment.toUpperCase()}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500">
-                      Created: {apiKey.created} {apiKey.lastUsed && `• Last used: ${apiKey.lastUsed}`}
-                    </p>
+                    <p className="text-xs text-gray-500">Created: {apiKey.created} {apiKey.lastUsed && `• Last used: ${apiKey.lastUsed}`}</p>
                   </div>
                   <button
                     onClick={() => handleDeleteKey(apiKey.id)}
-<<<<<<< HEAD
                     className="rounded-lg p-2 transition-colors hover:bg-red-500/20"
-=======
-                    className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
                     title="Delete"
                   >
                     <Trash2 size={16} className="text-red-400" />
                   </button>
                 </div>
 
-<<<<<<< HEAD
                 <div className="mb-4 border-b border-white/10 pb-4">
                   <p className="mb-2 text-xs font-medium text-gray-400">PERMISSIONS</p>
                   <div className="flex flex-wrap gap-2">
                     {apiKey.scopes.map((scope) => (
                       <span key={scope} className="rounded-lg bg-white/10 px-2.5 py-1 text-xs font-medium text-gray-300">
-=======
-                {/* Scopes */}
-                <div className="mb-4 pb-4 border-b border-white/10">
-                  <p className="text-xs font-medium text-gray-400 mb-2">PERMISSIONS</p>
-                  <div className="flex flex-wrap gap-2">
-                    {apiKey.scopes.map((scope) => (
-                      <span key={scope} className="px-2.5 py-1 rounded-lg bg-white/10 text-xs font-medium text-gray-300">
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
                         {getScopeLabel(scope)}
                       </span>
                     ))}
                   </div>
                 </div>
 
-<<<<<<< HEAD
                 <div className="space-y-3">
                   <div>
                     <div className="mb-2 flex items-center justify-between">
@@ -339,46 +267,17 @@ export default function AccountApiKeysPage() {
                       </button>
                     </div>
                     <div className="break-all rounded-lg border border-white/5 bg-black/40 p-3 font-mono text-xs text-gray-300">
-=======
-                {/* Keys Display */}
-                <div className="space-y-3">
-                  {/* Public Key */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-medium text-gray-400">PUBLIC KEY</p>
-                      <button
-                        onClick={() => handleCopy(apiKey.publicKey, `pub_${apiKey.id}`)}
-                        className="p-1 hover:bg-white/10 rounded transition-colors"
-                      >
-                        <Copy
-                          size={14}
-                          className={copied === `pub_${apiKey.id}` ? 'text-green-400' : 'text-gray-400'}
-                        />
-                      </button>
-                    </div>
-                    <div className="p-3 rounded-lg bg-black/40 border border-white/5 font-mono text-xs text-gray-300 break-all">
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
                       {apiKey.publicKey}
                     </div>
                   </div>
 
-<<<<<<< HEAD
                   <div>
                     <div className="mb-2 flex items-center justify-between">
-=======
-                  {/* Secret Key */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
                       <p className="text-xs font-medium text-gray-400">SECRET KEY</p>
                       <div className="flex gap-1">
                         <button
                           onClick={() => handleToggleVisibility(apiKey.id)}
-<<<<<<< HEAD
                           className="rounded p-1 transition-colors hover:bg-white/10"
-=======
-                          className="p-1 hover:bg-white/10 rounded transition-colors"
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
                         >
                           {apiKey.visibleSecret ? (
                             <EyeOff size={14} className="text-gray-400" />
@@ -388,7 +287,6 @@ export default function AccountApiKeysPage() {
                         </button>
                         <button
                           onClick={() => handleCopy(apiKey.secretKey, `sec_${apiKey.id}`)}
-<<<<<<< HEAD
                           className="rounded p-1 transition-colors hover:bg-white/10"
                         >
                           <Copy size={14} className={copied === `sec_${apiKey.id}` ? 'text-green-400' : 'text-gray-400'} />
@@ -399,21 +297,6 @@ export default function AccountApiKeysPage() {
                       {apiKey.visibleSecret ? apiKey.secretKey : '••••••••••••••••••••••••••••••••••••••••••••••••••••'}
                     </div>
                     <p className="mt-2 text-xs text-red-400">⚠️ Keep your secret key confidential. Never expose it in client-side code.</p>
-=======
-                          className="p-1 hover:bg-white/10 rounded transition-colors"
-                        >
-                          <Copy
-                            size={14}
-                            className={copied === `sec_${apiKey.id}` ? 'text-green-400' : 'text-gray-400'}
-                          />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="p-3 rounded-lg bg-black/40 border border-red-500/20 font-mono text-xs text-gray-300 break-all">
-                      {apiKey.visibleSecret ? apiKey.secretKey : '••••••••••••••••••••••••••••••••••••••••••••••••••••'}
-                    </div>
-                    <p className="text-xs text-red-400 mt-2">⚠️ Keep your secret key confidential. Never expose it in client-side code.</p>
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
                   </div>
                 </div>
               </section>
@@ -421,46 +304,26 @@ export default function AccountApiKeysPage() {
           )}
         </div>
 
-<<<<<<< HEAD
         <section className={CARD}>
           <div className="mb-4 flex items-center gap-2">
-=======
-        {/* Integration Guide */}
-        <section className={CARD}>
-          <div className="flex items-center gap-2 mb-4">
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
             <BookOpen size={18} className="text-[#FF6B35]" />
             <h2 className="text-xl font-semibold text-white">Integration Guide</h2>
           </div>
 
           <div className="space-y-4">
             <div>
-<<<<<<< HEAD
               <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
                 <Code2 size={14} className="text-[#FF6B35]" />
                 Authentication
               </h4>
               <div className="rounded-lg border border-white/5 bg-black/40 p-3">
                 <p className="mb-2 font-mono text-xs text-gray-300">// Include Public Key in API requests</p>
-                <p className="font-mono text-xs text-gray-300">curl -H "Authorization: Bearer estatemind_pk_..." https://api.estatemind.com/v1/properties</p>
-=======
-              <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                <Code2 size={14} className="text-[#FF6B35]" />
-                Authentication
-              </h4>
-              <div className="p-3 rounded-lg bg-black/40 border border-white/5">
-                <p className="text-xs text-gray-300 font-mono mb-2">// Include Public Key in API requests</p>
-                <p className="text-xs text-gray-300 font-mono">curl -H "Authorization: Bearer estatemind_pk_..." https://api.estatemind.com/v1/properties</p>
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
+                <p className="font-mono text-xs text-gray-300">curl -H &quot;Authorization: Bearer estatemind_pk_...&quot; https://api.estatemind.com/v1/properties</p>
               </div>
             </div>
 
             <div>
-<<<<<<< HEAD
               <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
-=======
-              <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
                 <Globe size={14} className="text-[#FF6B35]" />
                 API Endpoints
               </h4>
@@ -473,28 +336,15 @@ export default function AccountApiKeysPage() {
             </div>
 
             <div>
-<<<<<<< HEAD
               <a href="#" className="inline-flex items-center gap-2 text-sm font-medium text-[#FF6B35] hover:text-[#FFB38F]">
-=======
-              <a
-                href="#"
-                className="inline-flex items-center gap-2 text-[#FF6B35] hover:text-[#FFB38F] font-medium text-sm"
-              >
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
                 View Full API Documentation →
               </a>
             </div>
           </div>
         </section>
 
-<<<<<<< HEAD
         <section className={CARD}>
           <div className="mb-4 flex items-center gap-2">
-=======
-        {/* Best Practices */}
-        <section className={CARD}>
-          <div className="flex items-center gap-2 mb-4">
->>>>>>> f285380 (fix: resolve Stripe payment form issues comprehensively)
             <Lock size={18} className="text-[#FF6B35]" />
             <h2 className="text-xl font-semibold text-white">Best Practices</h2>
           </div>
