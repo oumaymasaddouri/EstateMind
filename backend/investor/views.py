@@ -202,44 +202,104 @@ def opportunities(request):
     Returns best investment opportunities across delegations.
     Uses forecast + zone data to rank delegations by opportunity score.
     """
+    from core.models import Delegation
     from forecast.models import DelegationPriceData
-    from forecast.models import DelegationForecast
 
-    ptype  = request.GET.get('property_type', 'apartment')
-    limit  = int(request.GET.get('limit', 20))
+    ptype_raw = (request.GET.get('property_type') or 'apartment').strip().lower()
+    ptype_map = {
+        'apartment': 'apartment',
+        'apartments': 'apartment',
+        'house': 'house',
+        'houses': 'house',
+        'commercial': 'commercial',
+        'land': 'land',
+    }
+    ptype = ptype_map.get(ptype_raw, 'apartment')
 
-    # Pull latest delegation price data for the requested type
-    rows = DelegationPriceData.objects.filter(property_type=ptype).order_by('-annual_trend_pct')[:100]
+    try:
+        limit = max(1, min(int(request.GET.get('limit', 20)), 100))
+    except (TypeError, ValueError):
+        limit = 20
+
+    # Primary source: forecast snapshot table by property type.
+    rows = list(
+        DelegationPriceData.objects
+        .filter(property_type=ptype)
+        .exclude(price_avg__isnull=True)
+        .order_by('-annual_trend_pct')[:200]
+    )
+
+    # Fallback source: core delegation benchmark fields.
+    if not rows:
+        field_map = {
+            'apartment': ('apt_avg_tnd', 'apt_trend_pct'),
+            'house': ('house_avg_tnd', 'house_trend_pct'),
+            'commercial': ('comm_avg_tnd', 'comm_trend_pct'),
+            'land': ('land_avg_tnd', 'land_trend_pct'),
+        }
+        avg_field, trend_field = field_map.get(ptype, field_map['apartment'])
+        core_rows = (
+            Delegation.objects
+            .exclude(**{f'{avg_field}__isnull': True})
+            .values('name', 'region__governorate', avg_field, trend_field)
+        )
+        rows = [
+            {
+                'delegation_name': row['name'],
+                'governorate': row['region__governorate'] or '',
+                'price_avg': row.get(avg_field) or 0,
+                'annual_trend_pct': row.get(trend_field) or 0,
+            }
+            for row in core_rows
+            if (row.get(avg_field) or 0) > 0
+        ]
 
     results = []
     for row in rows:
-        zone = get_zone_stats(row.delegation_name, ptype)
-        fcst = get_zone_forecast(row.delegation_name, ptype)
+        if hasattr(row, 'delegation_name'):
+            delegation_name = row.delegation_name
+            governorate = row.governorate
+            price_avg = row.price_avg
+            annual_trend_pct = row.annual_trend_pct
+        else:
+            delegation_name = row.get('delegation_name', '')
+            governorate = row.get('governorate', '')
+            price_avg = row.get('price_avg')
+            annual_trend_pct = row.get('annual_trend_pct')
 
-        price    = row.price_avg
-        surface  = 100.0
+        price = float(price_avg or 0)
+        if price <= 0:
+            continue
+
+        _ = get_zone_stats(delegation_name, ptype)
+        _ = get_zone_forecast(delegation_name, ptype)
+
         inp = {
-            'listing_price_tnd': price * surface,
-            'surface_m2':        surface,
-            'property_type':     ptype,
-            'governorate':       row.governorate,
-            'delegation':        row.delegation_name,
-            'room_count':        3,
+            'listing_price_tnd': price * 100.0,
+            'surface_m2': 100.0,
+            'property_type': ptype,
+            'governorate': governorate,
+            'delegation': delegation_name,
+            'room_count': 3,
         }
 
-        scored = score_listing(inp)
+        try:
+            scored = score_listing(inp)
+        except Exception:
+            continue
+
         results.append({
-            'delegation':         row.delegation_name,
-            'governorate':        row.governorate,
-            'avg_price_pm2':      row.price_avg,
-            'annual_trend_pct':   row.annual_trend_pct,
-            'opportunity_score':  scored['opportunity_score'],
-            'investment_grade':   scored['investment_grade'],
-            'gross_yield_pct':    scored['yield']['gross_yield_pct'],
-            'buy_signal':         scored['buy_signal']['signal'],
-            'forecast_6m_pct':    scored['forecast']['forecast_6m_pct'],
-            'forecast_12m_pct':   scored['forecast']['forecast_12m_pct'],
-            'undervaluation':     scored['undervaluation']['label'],
+            'delegation': delegation_name,
+            'governorate': governorate,
+            'avg_price_pm2': price,
+            'annual_trend_pct': float(annual_trend_pct or 0),
+            'opportunity_score': scored['opportunity_score'],
+            'investment_grade': scored['investment_grade'],
+            'gross_yield_pct': scored['yield']['gross_yield_pct'],
+            'buy_signal': scored['buy_signal']['signal'],
+            'forecast_6m_pct': scored['forecast']['forecast_6m_pct'],
+            'forecast_12m_pct': scored['forecast']['forecast_12m_pct'],
+            'undervaluation': scored['undervaluation']['label'],
         })
 
     results.sort(key=lambda x: x['opportunity_score'], reverse=True)

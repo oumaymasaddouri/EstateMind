@@ -1,27 +1,28 @@
 """
-Forecast service — query layer over DelegationForecast + DelegationPriceData.
-All DelegationForecast prices stored in millimes (÷1000 → TND/m²).
-DelegationPriceData prices stored directly in TND/m².
+Forecast service built on DelegationForecast and core delegation benchmarks.
+
+DelegationForecast stores prices in millimes, so values are converted to TND/m²
+at the API boundary for display and charting.
 """
 from __future__ import annotations
-import logging
+
 from datetime import date
+import logging
+from typing import Iterable
 
 logger = logging.getLogger(__name__)
 
-MAPE = 2.50 / 100   # model mean absolute percentage error
+MAPE = 2.50 / 100
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _tnd(millimes):
-    return round(millimes / 1000, 2)
+    return round(float(millimes or 0) / 1000, 2)
 
 
-def _month_label(d):
-    if isinstance(d, str):
-        d = date.fromisoformat(d)
-    return d.strftime('%b %Y')
+def _month_label(value):
+    if isinstance(value, str):
+        value = date.fromisoformat(value)
+    return value.strftime('%b %Y')
 
 
 def _trend(growth_pct):
@@ -32,145 +33,151 @@ def _trend(growth_pct):
     return 'stable'
 
 
-# ── Single-delegation 12-month forecast ───────────────────────────────────────
+def _latest_origin():
+    from valuation.models import DelegationForecast
+
+    return (
+        DelegationForecast.objects.order_by('-forecast_origin')
+        .values_list('forecast_origin', flat=True)
+        .first()
+    )
+
+
+def _latest_rows(**filters):
+    from valuation.models import DelegationForecast
+
+    latest_origin = _latest_origin()
+    if latest_origin is None:
+        return DelegationForecast.objects.none()
+    return DelegationForecast.objects.filter(forecast_origin=latest_origin, **filters)
+
+
+def _delegation_price_range(row, property_type: str = 'apartment') -> dict | None:
+    from core.models import Delegation
+
+    delegation = None
+    if getattr(row, 'delegation_fk_id', None):
+        delegation = row.delegation_fk
+    if delegation is None and row.governorate:
+        delegation = (
+            Delegation.objects.filter(region__governorate__iexact=row.governorate, name__iexact=row.delegation_name)
+            .first()
+        )
+    if delegation is None:
+        return None
+
+    field_map = {
+        'apartment': ('apt_min_tnd', 'apt_avg_tnd', 'apt_max_tnd', 'apt_trend_pct'),
+        'house': ('house_min_tnd', 'house_avg_tnd', 'house_max_tnd', 'house_trend_pct'),
+        'commercial': ('comm_min_tnd', 'comm_avg_tnd', 'comm_max_tnd', 'comm_trend_pct'),
+        'land': ('land_min_tnd', 'land_avg_tnd', 'land_max_tnd', 'land_trend_pct'),
+    }
+    min_field, avg_field, max_field, trend_field = field_map.get((property_type or 'apartment').lower(), field_map['apartment'])
+    return {
+        'min': getattr(delegation, min_field, None),
+        'avg': getattr(delegation, avg_field, None),
+        'max': getattr(delegation, max_field, None),
+        'annual_trend_pct': getattr(delegation, trend_field, None),
+        'notes': 'Derived from core delegation benchmarks.',
+    }
+
+
+def _build_months(rows: Iterable) -> list[dict]:
+    months = []
+    for row in rows:
+        price = _tnd(row.predicted_price_per_m2)
+        months.append({
+            'horizon': row.horizon_idx,
+            'month': str(row.forecast_month),
+            'month_label': _month_label(row.forecast_month),
+            'price_per_m2': price,
+            'lower': round(price * (1 - MAPE), 2),
+            'upper': round(price * (1 + MAPE), 2),
+        })
+    return months
+
 
 def get_delegation_forecast(delegation_name: str, property_type: str = 'apartment'):
-    from valuation.models import DelegationForecast
-    qs = (
-        DelegationForecast.objects
-        .filter(delegation_name__iexact=delegation_name, property_type=property_type)
-        .order_by('horizon_idx')
-    )
-    rows = list(qs)
+    rows = list(_latest_rows(delegation_name__iexact=delegation_name).order_by('horizon_idx'))
     if not rows:
         return None
 
-    months = []
-    for r in rows:
-        price = _tnd(r.predicted_price_per_m2)
-        months.append({
-            'horizon':      r.horizon_idx,
-            'month':        str(r.forecast_month),
-            'month_label':  _month_label(r.forecast_month),
-            'price_per_m2': price,
-            'lower':        round(price * (1 - MAPE), 2),
-            'upper':        round(price * (1 + MAPE), 2),
-        })
-
+    months = _build_months(rows)
     first = months[0]['price_per_m2']
-    mid   = months[5]['price_per_m2'] if len(months) >= 6 else first
-    last  = months[-1]['price_per_m2']
-    g6    = round((mid  - first) / first * 100, 2) if first else 0
-    g12   = round((last - first) / first * 100, 2) if first else 0
-
-    # Pull min/max from DelegationPriceData for context
-    price_range = _get_price_range(delegation_name, property_type)
+    mid = months[5]['price_per_m2'] if len(months) >= 6 else first
+    last = months[-1]['price_per_m2']
+    g6 = round((mid - first) / first * 100, 2) if first else 0
+    g12 = round((last - first) / first * 100, 2) if first else 0
 
     return {
-        'delegation':      rows[0].delegation_name,
-        'governorate':     rows[0].governorate,
-        'property_type':   property_type,
+        'delegation': rows[0].delegation_name,
+        'governorate': rows[0].governorate,
+        'property_type': property_type,
         'forecast_origin': str(rows[0].forecast_origin),
-        'model_mape_pct':  rows[0].model_mape_pct,
-        'model_version':   rows[0].model_version,
-        'months':          months,
-        'price_range':     price_range,
+        'model_mape_pct': rows[0].model_mape_pct,
+        'model_version': rows[0].model_version,
+        'months': months,
+        'price_range': _delegation_price_range(rows[0], property_type),
         'summary': {
             'current_price_per_m2': first,
-            'price_6m':             mid,
-            'price_12m':            last,
-            'growth_pct_6m':        g6,
-            'growth_pct_12m':       g12,
-            'trend':                _trend(g12),
+            'price_6m': mid,
+            'price_12m': last,
+            'growth_pct_6m': g6,
+            'growth_pct_12m': g12,
+            'trend': _trend(g12),
         },
     }
 
 
-def _get_price_range(delegation_name: str, property_type: str):
-    from valuation.models import DelegationPriceData
-    try:
-        obj = DelegationPriceData.objects.get(
-            delegation_name__iexact=delegation_name,
-            property_type=property_type,
-        )
-        return {
-            'min': obj.price_min,
-            'avg': obj.price_avg,
-            'max': obj.price_max,
-            'annual_trend_pct': obj.annual_trend_pct,
-            'notes': obj.notes,
-        }
-    except DelegationPriceData.DoesNotExist:
-        return None
-
-
-# ── Full market summary (all delegations, one property type) ──────────────────
-
 def get_market_data(property_type: str = 'apartment'):
-    from valuation.models import DelegationPriceData, DelegationForecast
-
-    price_qs = list(
-        DelegationPriceData.objects
-        .filter(property_type=property_type)
-        .order_by('governorate', 'delegation_name')
-    )
-    if not price_qs:
+    rows = list(_latest_rows().order_by('governorate', 'delegation_name'))
+    if not rows:
         return None
 
-    # Dec 2026 forecasts (horizon_idx=12) for quick growth calc
-    forecast_map = {
-        r['delegation_name']: r['predicted_price_per_m2']
-        for r in DelegationForecast.objects
-        .filter(property_type=property_type, horizon_idx=12)
-        .values('delegation_name', 'predicted_price_per_m2')
-    }
+    by_name: dict[str, list] = {}
+    for row in rows:
+        by_name.setdefault(row.delegation_name, []).append(row)
 
     delegations = []
     avgs = []
-
-    for pd in price_qs:
-        mm12 = forecast_map.get(pd.delegation_name)
-        price_12m = round(mm12 / 1000, 2) if mm12 else pd.price_avg
-        growth_12m = round((price_12m - pd.price_avg) / pd.price_avg * 100, 2) if pd.price_avg else 0
-
-        avgs.append(pd.price_avg)
+    for delegation_name, items in by_name.items():
+        first = _tnd(items[0].predicted_price_per_m2)
+        last = _tnd(items[-1].predicted_price_per_m2)
+        growth_12m = round((last - first) / first * 100, 2) if first else 0
+        avgs.append(first)
+        price_range = _delegation_price_range(items[0], property_type)
         delegations.append({
-            'delegation':       pd.delegation_name,
-            'governorate':      pd.governorate,
-            'price_min':        pd.price_min,
-            'price_avg':        pd.price_avg,
-            'price_max':        pd.price_max,
-            'price_12m':        price_12m,
-            'annual_trend_pct': pd.annual_trend_pct,
-            'growth_pct_12m':   growth_12m,
-            'trend':            _trend(growth_12m),
-            'notes':            pd.notes,
+            'delegation': delegation_name,
+            'governorate': items[0].governorate,
+            'price_min': price_range['min'] if price_range else None,
+            'price_avg': price_range['avg'] if price_range else first,
+            'price_max': price_range['max'] if price_range else None,
+            'price_12m': last,
+            'annual_trend_pct': price_range['annual_trend_pct'] if price_range else growth_12m,
+            'growth_pct_12m': growth_12m,
+            'trend': _trend(growth_12m),
+            'notes': price_range['notes'] if price_range else 'Forecast derived from latest valuation model.',
         })
 
     national_avg = round(sum(avgs) / len(avgs), 0) if avgs else 0
-    by_price  = sorted(delegations, key=lambda x: x['price_avg'], reverse=True)
-    by_growth = sorted(delegations, key=lambda x: x['annual_trend_pct'], reverse=True)
+    by_price = sorted(delegations, key=lambda x: (x['price_avg'] or 0), reverse=True)
+    by_growth = sorted(delegations, key=lambda x: (x['growth_pct_12m'] or 0), reverse=True)
 
     return {
-        'property_type':      property_type,
-        'total_delegations':  len(delegations),
-        'national_avg':       national_avg,
-        'top_price':    {'delegation': by_price[0]['delegation'],  'governorate': by_price[0]['governorate'],  'value': by_price[0]['price_avg']}  if by_price  else None,
-        'top_growth':   {'delegation': by_growth[0]['delegation'], 'governorate': by_growth[0]['governorate'], 'pct':   by_growth[0]['annual_trend_pct']} if by_growth else None,
-        'top_decline':  {'delegation': by_growth[-1]['delegation'],'governorate': by_growth[-1]['governorate'],'pct':   by_growth[-1]['annual_trend_pct']} if by_growth else None,
-        'delegations':        delegations,
+        'property_type': property_type,
+        'total_delegations': len(delegations),
+        'national_avg': national_avg,
+        'top_price': {'delegation': by_price[0]['delegation'], 'governorate': by_price[0]['governorate'], 'value': by_price[0]['price_avg']} if by_price else None,
+        'top_growth': {'delegation': by_growth[0]['delegation'], 'governorate': by_growth[0]['governorate'], 'pct': by_growth[0]['growth_pct_12m']} if by_growth else None,
+        'top_decline': {'delegation': by_growth[-1]['delegation'], 'governorate': by_growth[-1]['governorate'], 'pct': by_growth[-1]['growth_pct_12m']} if by_growth else None,
+        'delegations': delegations,
     }
 
 
-# ── Governorate-level aggregate (kept for backward compat) ────────────────────
-
 def get_governorate_forecast_summary(governorate: str, property_type: str = 'apartment'):
-    from valuation.models import DelegationForecast
     from django.db.models import Avg
 
-    qs = DelegationForecast.objects.filter(
-        governorate__iexact=governorate, property_type=property_type
-    )
+    qs = _latest_rows(governorate__iexact=governorate)
     if not qs.exists():
         return None
 
@@ -179,114 +186,103 @@ def get_governorate_forecast_summary(governorate: str, property_type: str = 'apa
         .annotate(avg_price=Avg('predicted_price_per_m2'))
         .order_by('horizon_idx')
     )
+
     months = []
     for row in monthly_avgs:
         price = _tnd(row['avg_price'])
         months.append({
-            'horizon':      row['horizon_idx'],
-            'month':        str(row['forecast_month']),
-            'month_label':  _month_label(row['forecast_month']),
+            'horizon': row['horizon_idx'],
+            'month': str(row['forecast_month']),
+            'month_label': _month_label(row['forecast_month']),
             'price_per_m2': price,
-            'lower':        round(price * (1 - MAPE), 2),
-            'upper':        round(price * (1 + MAPE), 2),
+            'lower': round(price * (1 - MAPE), 2),
+            'upper': round(price * (1 + MAPE), 2),
         })
     if not months:
         return None
 
     first = months[0]['price_per_m2']
-    mid   = months[5]['price_per_m2'] if len(months) >= 6 else first
-    last  = months[-1]['price_per_m2']
-    g6    = round((mid  - first) / first * 100, 2) if first else 0
-    g12   = round((last - first) / first * 100, 2) if first else 0
+    mid = months[5]['price_per_m2'] if len(months) >= 6 else first
+    last = months[-1]['price_per_m2']
+    g6 = round((mid - first) / first * 100, 2) if first else 0
+    g12 = round((last - first) / first * 100, 2) if first else 0
 
     return {
-        'governorate':      governorate,
-        'property_type':    property_type,
+        'governorate': governorate,
+        'property_type': property_type,
         'delegation_count': qs.values('delegation_name').distinct().count(),
-        'months':           months,
-        'top_delegations':  _get_top_delegations(governorate, property_type, 5),
+        'months': months,
+        'top_delegations': _get_top_delegations(governorate, limit=5),
         'summary': {
             'current_price_per_m2': first,
-            'price_6m':             mid,
-            'price_12m':            last,
-            'growth_pct_6m':        g6,
-            'growth_pct_12m':       g12,
-            'trend':                _trend(g12),
+            'price_6m': mid,
+            'price_12m': last,
+            'growth_pct_6m': g6,
+            'growth_pct_12m': g12,
+            'trend': _trend(g12),
         },
     }
 
 
-def _get_top_delegations(governorate: str, property_type: str, limit: int = 5):
-    from valuation.models import DelegationForecast
+def _get_top_delegations(governorate: str, limit: int = 5):
     from django.db.models import Avg
 
-    d1  = (DelegationForecast.objects
-           .filter(governorate__iexact=governorate, property_type=property_type, horizon_idx=1)
-           .values('delegation_name').annotate(avg1=Avg('predicted_price_per_m2')))
-    d12 = (DelegationForecast.objects
-           .filter(governorate__iexact=governorate, property_type=property_type, horizon_idx=12)
-           .values('delegation_name').annotate(avg12=Avg('predicted_price_per_m2')))
+    d1 = _latest_rows(governorate__iexact=governorate, horizon_idx=1).values('delegation_name').annotate(avg1=Avg('predicted_price_per_m2'))
+    d12 = _latest_rows(governorate__iexact=governorate, horizon_idx=12).values('delegation_name').annotate(avg12=Avg('predicted_price_per_m2'))
 
-    d1_map  = {r['delegation_name']: r['avg1']  for r in d1}
-    d12_map = {r['delegation_name']: r['avg12'] for r in d12}
+    d1_map = {row['delegation_name']: row['avg1'] for row in d1}
+    d12_map = {row['delegation_name']: row['avg12'] for row in d12}
 
     result = []
     for name, price1 in d1_map.items():
         if not price1:
             continue
         price12 = d12_map.get(name, price1)
-        growth  = round((price12 - price1) / price1 * 100, 2) if price1 else 0
+        growth = round((price12 - price1) / price1 * 100, 2) if price1 else 0
         result.append({
-            'delegation':       name,
-            'price_jan_tnd':    _tnd(price1),
-            'price_dec_tnd':    _tnd(price12),
-            'growth_pct_12m':   growth,
+            'delegation': name,
+            'price_jan_tnd': _tnd(price1),
+            'price_dec_tnd': _tnd(price12),
+            'growth_pct_12m': growth,
         })
     result.sort(key=lambda x: x['growth_pct_12m'], reverse=True)
     return result[:limit]
 
 
-# ── National top-movers (delegation level) ────────────────────────────────────
-
 def get_national_summary(property_type: str = 'apartment'):
-    from valuation.models import DelegationForecast
     from django.db.models import Avg
 
-    d1_qs  = (DelegationForecast.objects.filter(horizon_idx=1,  property_type=property_type)
-              .values('delegation_name', 'governorate').annotate(avg1=Avg('predicted_price_per_m2')))
-    d12_qs = (DelegationForecast.objects.filter(horizon_idx=12, property_type=property_type)
-              .values('delegation_name').annotate(avg12=Avg('predicted_price_per_m2')))
+    d1_qs = _latest_rows(horizon_idx=1).values('delegation_name', 'governorate').annotate(avg1=Avg('predicted_price_per_m2'))
+    d12_qs = _latest_rows(horizon_idx=12).values('delegation_name').annotate(avg12=Avg('predicted_price_per_m2'))
 
-    d1_map  = {r['delegation_name']: (r['avg1'], r['governorate']) for r in d1_qs}
-    d12_map = {r['delegation_name']: r['avg12'] for r in d12_qs}
+    d1_map = {row['delegation_name']: (row['avg1'], row['governorate']) for row in d1_qs}
+    d12_map = {row['delegation_name']: row['avg12'] for row in d12_qs}
 
-    dels = []
+    delegations = []
     for name, (price1, gov) in d1_map.items():
         if not price1:
             continue
         price12 = d12_map.get(name, price1)
-        growth  = round((price12 - price1) / price1 * 100, 2) if price1 else 0
-        dels.append({
-            'delegation':      name,
-            'governorate':     gov,
-            'price_jan_tnd':   _tnd(price1),
-            'price_dec_tnd':   _tnd(price12),
-            'growth_pct_12m':  growth,
+        growth = round((price12 - price1) / price1 * 100, 2) if price1 else 0
+        delegations.append({
+            'delegation': name,
+            'governorate': gov,
+            'price_jan_tnd': _tnd(price1),
+            'price_dec_tnd': _tnd(price12),
+            'growth_pct_12m': growth,
         })
-    dels.sort(key=lambda x: x['growth_pct_12m'], reverse=True)
+
+    delegations.sort(key=lambda x: x['growth_pct_12m'], reverse=True)
     return {
-        'property_type':    property_type,
-        'top_delegations':  dels[:10],
-        'total_delegations': len(dels),
+        'property_type': property_type,
+        'top_delegations': delegations[:10],
+        'total_delegations': len(delegations),
     }
 
 
-# ── Location lists ─────────────────────────────────────────────────────────────
-
 def list_governorates_with_forecasts():
-    from valuation.models import DelegationPriceData
     return sorted(
-        DelegationPriceData.objects
+        _latest_rows()
         .exclude(governorate='')
         .values_list('governorate', flat=True)
         .distinct()
@@ -294,10 +290,8 @@ def list_governorates_with_forecasts():
 
 
 def list_delegations_for_governorate(governorate: str):
-    from valuation.models import DelegationPriceData
     return sorted(
-        DelegationPriceData.objects
-        .filter(governorate__iexact=governorate)
+        _latest_rows(governorate__iexact=governorate)
         .values_list('delegation_name', flat=True)
         .distinct()
     )

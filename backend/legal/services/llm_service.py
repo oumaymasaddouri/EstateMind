@@ -12,6 +12,14 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logger = logging.getLogger(__name__)
 
 
+_MODEL_FALLBACKS = (
+    'hosted_vllm/Llama-3.1-70B-Instruct',
+    'hosted_vllm/Llama-3.1-8B-Instruct',
+    'meta-llama/Meta-Llama-3.1-8B-Instruct',
+    'mistralai/Mistral-7B-Instruct-v0.3',
+)
+
+
 def _cfg() -> dict:
     from django.conf import settings
     return getattr(settings, 'LEGAL_RAG', {})
@@ -22,14 +30,16 @@ def generate(system_prompt: str, user_prompt: str, max_tokens: int = 750) -> str
     base = cfg.get('LLM_API_URL', 'https://tokenfactory.esprit.tn/api').rstrip('/')
     url = f"{base}/chat/completions"
     api_key = cfg.get('LLM_API_KEY', '')
-    model = cfg.get('LLM_MODEL', 'hosted_vllm/Llama-3.1-70B-Instruct')
+    configured_model = cfg.get('LLM_MODEL', 'hosted_vllm/Llama-3.1-70B-Instruct')
+    model_candidates = [configured_model, *_MODEL_FALLBACKS]
+    # Keep order stable while removing duplicates.
+    model_candidates = list(dict.fromkeys(m for m in model_candidates if m))
 
     headers = {
         'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json',
     }
-    payload = {
-        'model': model,
+    payload_base = {
         'messages': [
             {'role': 'system', 'content': system_prompt},
             {'role': 'user',   'content': user_prompt},
@@ -41,20 +51,35 @@ def generate(system_prompt: str, user_prompt: str, max_tokens: int = 750) -> str
         'presence_penalty': 0.0,
     }
 
-    try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=90, verify=False)
-        resp.raise_for_status()
-        data = resp.json()
-        content = data['choices'][0]['message']['content']
-        return content.strip()
-    except requests.exceptions.Timeout:
-        raise RuntimeError("The AI service took too long to respond. Please try again.")
-    except requests.exceptions.HTTPError as exc:
-        raise RuntimeError(f"AI service HTTP error {exc.response.status_code}: {exc.response.text[:200]}")
-    except (KeyError, IndexError, ValueError) as exc:
-        raise RuntimeError(f"Unexpected response from AI service: {exc}")
-    except requests.exceptions.RequestException as exc:
-        raise RuntimeError(f"Could not reach the AI service: {exc}")
+    last_error: str | None = None
+    for model in model_candidates:
+        payload = dict(payload_base)
+        payload['model'] = model
+        try:
+            resp = requests.post(url, json=payload, headers=headers, timeout=90, verify=False)
+            resp.raise_for_status()
+            data = resp.json()
+            content = data['choices'][0]['message']['content']
+            return content.strip()
+        except requests.exceptions.Timeout:
+            raise RuntimeError("The AI service took too long to respond. Please try again.")
+        except requests.exceptions.HTTPError as exc:
+            status_code = getattr(exc.response, 'status_code', None)
+            body = (getattr(exc.response, 'text', '') or '')[:200]
+            message = f"AI service HTTP error {status_code}: {body}"
+            last_error = message
+            if status_code == 404 and 'model' in body.lower():
+                logger.warning("Legal LLM model not found: %s", model)
+                continue
+            raise RuntimeError(message)
+        except (KeyError, IndexError, ValueError) as exc:
+            raise RuntimeError(f"Unexpected response from AI service: {exc}")
+        except requests.exceptions.RequestException as exc:
+            raise RuntimeError(f"Could not reach the AI service: {exc}")
+
+    if last_error:
+        raise RuntimeError(last_error)
+    raise RuntimeError("AI service model not available.")
 
 
 def check_availability() -> bool:

@@ -9,6 +9,8 @@ import { getInvestorOpportunities } from '../../services/api';
 /* ── Design tokens ─────────────────────────────────────────── */
 const CARD   = 'rounded-2xl border border-white/10 bg-white/5';
 const ORANGE = '#FF6B35';
+const SELECT_CLS = 'rounded-xl border border-white/20 bg-[#111827] px-3 py-1.5 text-xs text-white ' +
+  'focus:outline-none focus:border-[#FF6B35]/60 focus:ring-1 focus:ring-[#FF6B35]/30 transition-colors';
 
 const PTYPES = [
   { value: 'apartment',  label: 'Apartments'  },
@@ -80,6 +82,7 @@ function Th({ label, col, sort, asc, onSort, align = 'left' }) {
 export default function OpportunitiesPage() {
   const [data,    setData]    = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState('');
   const [ptype,   setPtype]   = useState('apartment');
   const [limit,   setLimit]   = useState(20);
   const [sort,    setSort]    = useState('opportunity_score');
@@ -87,9 +90,13 @@ export default function OpportunitiesPage() {
 
   useEffect(() => {
     setLoading(true);
+    setError('');
     getInvestorOpportunities({ property_type: ptype, limit })
       .then(r => setData(r.data || []))
-      .catch(() => setData([]))
+      .catch((e) => {
+        setData([]);
+        setError(e?.response?.data?.error || 'Could not load opportunities right now.');
+      })
       .finally(() => setLoading(false));
   }, [ptype, limit]);
 
@@ -135,8 +142,7 @@ export default function OpportunitiesPage() {
             ))}
           </div>
           <select
-            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5
-              text-xs text-white focus:outline-none focus:border-[#FF6B35]/50"
+            className={SELECT_CLS}
             value={limit} onChange={e => setLimit(parseInt(e.target.value))}>
             <option value={10}>Top 10</option>
             <option value={20}>Top 20</option>
@@ -151,7 +157,9 @@ export default function OpportunitiesPage() {
         </div>
       ) : sorted.length === 0 ? (
         <div className={`${CARD} flex items-center justify-center h-48`}>
-          <p className="text-sm text-gray-500">No data available for this property type</p>
+          <p className="text-sm text-gray-500">
+            {error || 'No data available for this property type'}
+          </p>
         </div>
       ) : (
         <>

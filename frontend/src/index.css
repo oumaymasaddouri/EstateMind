@@ -137,6 +137,29 @@ body {
   animation: floatAnim 10s ease-in-out infinite 4s;
 }
 
+/* Platform-wide dropdown polish */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: #111827;
+  color: #f3f4f6;
+}
+
+select:focus {
+  outline: none;
+}
+
+select option {
+  background-color: #0b1220;
+  color: #f8fafc;
+}
+
+select option:checked {
+  background-color: #ff6b35;
+  color: #ffffff;
+}
+
 /* Number counter animation */
 @keyframes countUp {
   from { opacity: 0; transform: translateY(20px); }

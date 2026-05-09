@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import {
   getPortfolioAssets, addPortfolioAsset, deletePortfolioAsset,
-  scorePortfolio, scorePortfolioAsset,
+  scorePortfolio, scorePortfolioAsset, getForecastDelegationList,
 } from '../../services/api';
 
 /* ── Design tokens ─────────────────────────────────────────── */
@@ -37,16 +37,27 @@ const EMPTY_FORM = {
   property_name: '', property_type: 'apartment', governorate: 'Tunis',
   delegation: '', surface_m2: '', room_count: 3, floor_level: 0, amenity_score: 1,
   acquisition_price_tnd: '', acquisition_date: new Date().toISOString().slice(0, 10),
-  current_value_tnd: '', is_rented: false,
+  is_rented: false,
   monthly_rent_tnd: '', monthly_opex_tnd: '', notes: '',
 };
 
 /* ── Add Asset Drawer ──────────────────────────────────────── */
 function AddDrawer({ onClose, onSave }) {
   const [form, setForm] = useState(EMPTY_FORM);
+  const [delegs, setDelegs] = useState([]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    if (!form.governorate) {
+      setDelegs([]);
+      return;
+    }
+    getForecastDelegationList(form.governorate)
+      .then(r => setDelegs(r.data?.delegations || r.data || []))
+      .catch(() => setDelegs([]));
+  }, [form.governorate]);
 
   const submit = async (e) => {
     e?.preventDefault();
@@ -59,7 +70,6 @@ function AddDrawer({ onClose, onSave }) {
         ...form,
         surface_m2:            parseFloat(form.surface_m2),
         acquisition_price_tnd: parseFloat(form.acquisition_price_tnd),
-        current_value_tnd:     form.current_value_tnd ? parseFloat(form.current_value_tnd) : null,
         monthly_rent_tnd:      parseFloat(form.monthly_rent_tnd  || 0),
         monthly_opex_tnd:      parseFloat(form.monthly_opex_tnd || 0),
       });
@@ -139,9 +149,16 @@ function AddDrawer({ onClose, onSave }) {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-400 mb-1.5">Area / Delegation</label>
-              <input className={INP} value={form.delegation}
+              <input
+                list="portfolio-delegations"
+                className={INP}
+                value={form.delegation}
                 onChange={e => set('delegation', e.target.value)}
                 placeholder="e.g. La Marsa" />
+              <datalist id="portfolio-delegations">
+                {delegs.map(d => <option key={d} value={d} />)}
+              </datalist>
+              <p className="mt-1 text-[10px] text-gray-600">Type to search delegations in the selected governorate.</p>
             </div>
           </div>
 
@@ -167,7 +184,7 @@ function AddDrawer({ onClose, onSave }) {
           </div>
 
           {/* Pricing */}
-          <div className="grid grid-cols-2 gap-3">
+          <div>
             <div>
               <label className="block text-xs font-medium text-gray-400 mb-1.5">
                 Purchase Price (TND) <span className="text-[#FF6B35]">*</span>
@@ -175,14 +192,6 @@ function AddDrawer({ onClose, onSave }) {
               <input type="number" className={INP} value={form.acquisition_price_tnd}
                 onChange={e => set('acquisition_price_tnd', e.target.value)}
                 placeholder="250 000" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                Current Value (TND)
-              </label>
-              <input type="number" className={INP} value={form.current_value_tnd}
-                onChange={e => set('current_value_tnd', e.target.value)}
-                placeholder="Optional" />
             </div>
           </div>
 
