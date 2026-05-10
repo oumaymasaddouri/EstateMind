@@ -83,7 +83,7 @@ def build(
     if amenities:
         labels = {'has_pool': 'pool', 'has_garden': 'garden', 'has_parking': 'parking',
                   'sea_view': 'sea view', 'elevator': 'elevator'}
-        amenity_str = ', '.join(labels.get(a, a) for a in amenities[:3])
+        amenity_str = ', '.join(labels.get(a, a) for a in amenities[:3])#type:ignore
         cond_notes.append(f"premium features ({amenity_str}) add to the valuation")
     if cond_notes:
         lines.append(f"Additionally, {' and '.join(cond_notes)}.")

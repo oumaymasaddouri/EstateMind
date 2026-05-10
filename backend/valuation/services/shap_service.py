@@ -70,7 +70,7 @@ def explain(data: dict, prediction: dict, market_context: dict | None = None, te
 
     # Engineered / market features
     if market_context.get('avg_price_per_m2'):
-        drivers.append(_impact('local_avg_price_m2', 'Local Avg Price/m²', float(market_context.get('avg_price_per_m2')) * max(size_m2, 1.0) * 0.05, estimated_price, True))
+        drivers.append(_impact('local_avg_price_m2', 'Local Avg Price/m²', float(market_context.get('avg_price_per_m2')) * max(size_m2, 1.0) * 0.05, estimated_price, True))#type:ignore
     if data.get('city') and data.get('governorate'):
         drivers.append(_impact('city_governorate', 'City-Governorate Prior', estimated_price * 0.03, estimated_price, True))
 

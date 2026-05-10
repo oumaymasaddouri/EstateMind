@@ -4,8 +4,17 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import { X, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import axios from 'axios';
 
-// Initialize Stripe
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
+// Initialize Stripe (guard against missing publishable key to avoid runtime error)
+const PUBLISHABLE_KEY = process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
+let stripePromise = null;
+if (typeof PUBLISHABLE_KEY === 'string' && PUBLISHABLE_KEY.trim().length > 0) {
+  stripePromise = loadStripe(PUBLISHABLE_KEY);
+} else {
+  // Avoid calling loadStripe with undefined which throws in runtime.
+  // This helps local development when env vars are not yet provided.
+  // eslint-disable-next-line no-console
+  console.warn('Stripe publishable key is not configured. Set REACT_APP_STRIPE_PUBLISHABLE_KEY in frontend/.env');
+}
 
 // Inner payment form component
 function PaymentForm({ clientSecret, plan, onSuccess, onClose, userEmail, userFullName, userPhone }) {
@@ -206,7 +215,14 @@ export default function PaymentModal({
           </div>
 
           {/* Payment Form */}
-          {clientSecret ? (
+          { !stripePromise ? (
+            <div className="p-6">
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">Stripe is not configured for this environment.</p>
+                <p className="text-xs text-gray-500 mt-2">Set <strong>REACT_APP_STRIPE_PUBLISHABLE_KEY</strong> in <strong>frontend/.env</strong> and restart the dev server.</p>
+              </div>
+            </div>
+          ) : clientSecret ? (
             <Elements stripe={stripePromise} options={options}>
               <PaymentForm
                 clientSecret={clientSecret}
