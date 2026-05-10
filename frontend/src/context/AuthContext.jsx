@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { canAccessPlan, normalizePlan } from '../utils/accessControl';
 import { trackUserActivity, createCheckoutSession, devUpgradePlan } from '../services/api';
@@ -10,40 +10,83 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('access_token'));
-  const [refreshToken, setRefreshToken] = useState(localStorage.getItem('refresh_token'));
+  const [, setRefreshToken] = useState(localStorage.getItem('refresh_token'));
 
   const API_BASE =
     (typeof window !== 'undefined' && window.__API_BASE__) ||
     process.env.REACT_APP_API_URL ||
     'http://localhost:8000/api';
 
-  // Initialize auth on mount
-  useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      verifyToken(token);
-    } else {
-      setLoading(false);
-    }
+  const clearStoredAuth = useCallback(() => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    setToken(null);
+    setRefreshToken(null);
+    setUser(null);
   }, []);
 
+  const refreshStoredToken = useCallback(async () => {
+    const storedRefreshToken = localStorage.getItem('refresh_token');
+    if (!storedRefreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    const response = await axios.post(`${API_BASE}/auth/token/refresh/`, {
+      refresh: storedRefreshToken,
+    });
+    const access = response.data?.access;
+    const refresh = response.data?.refresh;
+
+    if (!access) {
+      throw new Error('Token refresh response did not include an access token');
+    }
+
+    localStorage.setItem('access_token', access);
+    if (refresh) {
+      localStorage.setItem('refresh_token', refresh);
+      setRefreshToken(refresh);
+    }
+    setToken(access);
+    return access;
+  }, [API_BASE]);
+
   // Verify token and fetch current user
-  const verifyToken = async (token) => {
+  const verifyToken = useCallback(async (token) => {
     try {
+      if (!token) {
+        throw new Error('No access token available');
+      }
       const response = await axios.get(`${API_BASE}/auth/me/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUser(response.data);
       setToken(token);
     } catch (err) {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      setToken(null);
-      setUser(null);
+      try {
+        const access = await refreshStoredToken();
+        const response = await axios.get(`${API_BASE}/auth/me/`, {
+          headers: { Authorization: `Bearer ${access}` },
+        });
+        setUser(response.data);
+      } catch (refreshErr) {
+        clearStoredAuth();
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_BASE, clearStoredAuth, refreshStoredToken]);
+
+  // Initialize auth on mount
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      verifyToken(token);
+    } else if (localStorage.getItem('refresh_token')) {
+      verifyToken(null);
+    } else {
+      setLoading(false);
+    }
+  }, [verifyToken]);
 
   // Register
   const register = async (email, full_name, password, password_confirm, phone = '') => {
@@ -142,7 +185,7 @@ export const AuthProvider = ({ children }) => {
   const forgotPassword = async (email) => {
     setError(null);
     try {
-      const response = await axios.post(`${API_BASE}/auth/forgot_password/`, { email });
+      await axios.post(`${API_BASE}/auth/forgot_password/`, { email });
       return {
         success: true,
         message: 'If this email exists, you will receive a password reset link.',
@@ -156,7 +199,7 @@ export const AuthProvider = ({ children }) => {
   const resetPassword = async (token, password, password_confirm) => {
     setError(null);
     try {
-      const response = await axios.post(`${API_BASE}/auth/reset_password/`, {
+      await axios.post(`${API_BASE}/auth/reset_password/`, {
         token,
         password,
         password_confirm,
@@ -176,7 +219,7 @@ export const AuthProvider = ({ children }) => {
   const changePassword = async (old_password, password, password_confirm) => {
     setError(null);
     try {
-      const response = await axios.post(
+      await axios.post(
         `${API_BASE}/auth/change_password/`,
         { old_password, password, password_confirm },
         { headers: { Authorization: `Bearer ${token}` } }

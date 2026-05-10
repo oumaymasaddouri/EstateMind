@@ -42,7 +42,7 @@ def predict_valuation(request):
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    data        = dict(serializer.validated_data)
+    data = dict(serializer.validated_data)
     image_files = request.FILES.getlist('images') or []
     data['image_count'] = len(image_files)
 

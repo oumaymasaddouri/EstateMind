@@ -12,6 +12,11 @@ const api = axios.create({
   timeout: 10000,
 });
 
+const clearStoredAuth = () => {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+};
+
 api.interceptors.request.use((config) => {
   const accessToken = localStorage.getItem('access_token');
   if (accessToken) {
@@ -19,6 +24,49 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    const status = error.response?.status;
+    const refreshToken = localStorage.getItem('refresh_token');
+
+    if (status === 401 && refreshToken && originalRequest && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        const response = await axios.post(`${API_BASE}/auth/token/refresh/`, {
+          refresh: refreshToken,
+        });
+        const accessToken = response.data?.access;
+        const rotatedRefreshToken = response.data?.refresh;
+
+        if (!accessToken) {
+          throw new Error('Token refresh response did not include an access token');
+        }
+
+        localStorage.setItem('access_token', accessToken);
+        if (rotatedRefreshToken) {
+          localStorage.setItem('refresh_token', rotatedRefreshToken);
+        }
+
+        originalRequest.headers = originalRequest.headers || {};
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        clearStoredAuth();
+        return Promise.reject(refreshError);
+      }
+    }
+
+    if (status === 401) {
+      clearStoredAuth();
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 // ── Simulation engine API (Django /api/simulate/ on port 8000) ────────────
 export const simGetScenarios    = ()           => api.get('/simulate/scenarios/');

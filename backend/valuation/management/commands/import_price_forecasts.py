@@ -1,4 +1,4 @@
-"""
+﻿"""
 Management command: import 12-month price forecasts from the ML pipeline artefact.
 Run: python manage.py import_price_forecasts [--dry-run]
 """
@@ -106,3 +106,5 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f"Imported/updated {len(rows_to_upsert)} forecast rows."
         ))
+
+

@@ -12,6 +12,9 @@ def build(
     text_analysis: dict,
     shap_result: dict,
     image_analysis: dict | None = None,
+    cv_signals: dict | None = None,
+    text_signals: dict | None = None,
+    prediction_source: str | None = None,
 ) -> str:
     """Return a human-readable explanation string grounded in the active models."""
     lines = []
@@ -34,15 +37,22 @@ def build(
     mapped_from = data.get('property_type') or 'property'
     mapped_to = model_type or mapped_from
 
-    if mapped_from != mapped_to:
-        lines.append(
-            f"The request was normalized from **{mapped_from}** to **{mapped_to}** "
-            f"so the valuation can use the matching serving bundle."
-        )
+    # Sentence 0 — model source and signal note (concise)
+    model_source_text = "the CatBoost serving bundle" if prediction_source == 'catboost_bundle' else (
+        'the fallback tabular model' if prediction_source == 'fallback_tabular' else 'the valuation engine'
+    )
+    signals_applied = []
+    if cv_signals is not None:
+        signals_applied.append('computer vision analysis')
+    if text_signals is not None:
+        signals_applied.append('sentiment analysis')
+    signal_part = f" with {' and '.join(signals_applied)}" if signals_applied else ''
 
-    # Main estimate
-    loc_str  = f"{city}, {governorate}" if city else governorate
-    tx_str   = 'rental value' if transaction == 'rent' else 'market value'
+    lines.append(f"Using {model_source_text}{signal_part} for this valuation.")
+
+    # Sentence 1 — main estimate
+    loc_str = f"{city}, {governorate}" if city else governorate
+    tx_str  = 'rental value' if transaction == 'rent' else 'market value'
     size_str = f"{size_m2:.0f} m²" if size_m2 else ''
     room_str = f"{bedrooms}-bedroom " if bedrooms else ''
     lines.append(
@@ -53,7 +63,7 @@ def build(
         + f"with {conf_level.lower()} confidence ({conf_score}/100)."
     )
 
-    # Top driver
+    # Sentence 2 — top driver
     features = shap_result.get('features_impact', [])
     if features:
         top = features[0]
@@ -63,7 +73,7 @@ def build(
             f"≈{top['impact']:,} TND, ~{top['percent']:.1f}% of the estimate)."
         )
 
-    # Condition + amenities
+    # Sentence 3 — condition + amenities
     cond_notes = []
     if condition in ('new', 'excellent'):
         cond_notes.append(f"the {condition} condition commands a premium")
@@ -78,7 +88,7 @@ def build(
     if cond_notes:
         lines.append(f"Additionally, {' and '.join(cond_notes)}.")
 
-    # Comparables
+    # Sentence 4 — comparables
     n_comp = len(comparables)
     market_trend = market.get('market_trend', 'stable')
     avg_ppm2 = market.get('avg_price_per_m2')
@@ -96,18 +106,16 @@ def build(
             "the estimate relies fully on market priors for this area."
         )
 
-    # Text signal
+    # Sentence 5 — text and image signals
     tq = text_analysis.get('description_quality', '')
-    if tq and tq not in ('None', 'Not evaluated'):
+    if tq and tq != 'None':
         sentiment = text_analysis.get('description_sentiment_label', text_analysis.get('sentiment_label', 'neutral'))
         sentiment_mode = text_analysis.get('sentiment_mode', 'not_used')
         lines.append(
-            f"The description signal is **{tq.lower()}** quality with a {sentiment} tone "
-            f"from the {sentiment_mode} text model, "
+            f"The description signal is **{tq.lower()}** quality with a {sentiment} tone from the {sentiment_mode} text model, "
             f"which {'supports' if sentiment == 'positive' else 'keeps the narrative conservative for'} the listing value."
         )
 
-    # Image signal
     if image_analysis:
         cv_mode = image_analysis.get('cv_mode', 'not_used')
         image_count = int(image_analysis.get('image_count', 0) or 0)
@@ -120,11 +128,10 @@ def build(
         else:
             lines.append("No images were uploaded, so the CV path did not contribute to this valuation.")
 
-    # Model note
+    # Sentence 6 — model note
     if mode == 'heuristic':
         lines.append(
-            "**Note:** This estimate uses calibrated market priors. "
-            "Upload property images and add a detailed description to improve coverage."
+            "**Note:** This estimate uses calibrated market priors. Upload property images and add a detailed description to improve coverage."
         )
     elif mode == 'market_data':
         lines.append(
@@ -132,11 +139,10 @@ def build(
         )
     elif mode.startswith(('catboost', 'fallback_model')):
         lines.append(
-            "**Note:** The price engine is driven by the mapped CatBoost serving bundle, "
-            "with fallback tabular models used only when needed."
+            "**Note:** The price engine is driven by the mapped CatBoost serving bundle, with fallback tabular models used only when needed."
         )
 
-    # Bounds
+    # Sentence 7 — bounds
     lb = confidence.get('lower_bound', 0)
     ub = confidence.get('upper_bound', 0)
     lines.append(

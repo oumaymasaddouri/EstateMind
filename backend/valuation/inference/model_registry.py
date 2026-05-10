@@ -1,4 +1,5 @@
-"""Model artifact discovery and lazy loading for valuation serving."""
+"""Model artifact discovery and lazy loading for valuation serving.
+"""
 
 from __future__ import annotations
 
@@ -11,11 +12,13 @@ from .inference_bundle import InferenceBundle, load_reference_dataset
 
 try:
     import joblib
-except ModuleNotFoundError:
+except ModuleNotFoundError:  # pragma: no cover
     joblib = None  # type: ignore[assignment]
 
 
 def project_root() -> Path:
+    """Return the repository root used to resolve relative artifact paths."""
+
     # backend/valuation/inference -> parents[3] = repository root
     return Path(__file__).resolve().parents[3]
 
@@ -142,13 +145,16 @@ class ModelRegistry:
             return handle
         try:
             handle.estimator = joblib.load(handle.path)
-        except Exception as exc:
+        except Exception as exc:  # pragma: no cover
             handle.load_error = str(exc)
         return handle
 
     def _get_reference_df(self) -> Any:
         if self._reference_df is None:
-            self._reference_df = load_reference_dataset()
+            try:
+                self._reference_df = load_reference_dataset()
+            except FileNotFoundError:
+                self._reference_df = None
         return self._reference_df
 
     def maybe_load_bundle(self, handle: ModelHandle | None) -> ModelHandle | None:

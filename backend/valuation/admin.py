@@ -8,7 +8,7 @@ Each record captures: property inputs → pipeline output → stored history.
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import ValuationRequest, DelegationForecast
+from .models import ValuationRequest
 
 _TYPE_COLOR = {
     'apartment': '#3b82f6', 'house': '#8b5cf6', 'villa': '#ec4899',
@@ -136,17 +136,3 @@ class ValuationRequestAdmin(admin.ModelAdmin):
     @admin.display(description='Mode', ordering='prediction_mode')
     def mode_badge(self, obj):
         return _pill(obj.prediction_mode, _MODE_COLOR.get(obj.prediction_mode, '#6b7280'))
-
-
-@admin.register(DelegationForecast)
-class DelegationForecastAdmin(admin.ModelAdmin):
-    list_display = ('delegation_name', 'governorate', 'forecast_origin', 'horizon_idx', 'price_tnd_col', 'model_mape_pct')
-    list_filter  = ('governorate', 'forecast_origin', 'model_version')
-    search_fields = ('delegation_name', 'governorate')
-    ordering = ('delegation_name', 'horizon_idx')
-    list_per_page = 100
-
-    @admin.display(description='Price TND/m²', ordering='predicted_price_per_m2')
-    def price_tnd_col(self, obj):
-        tnd = obj.predicted_price_per_m2 / 1000
-        return format_html('<b>{:,.0f}</b>', tnd)

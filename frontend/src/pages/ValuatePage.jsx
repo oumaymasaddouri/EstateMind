@@ -624,7 +624,6 @@ function Results({ result, txType }) {
     { id:'impact',        l:'Price Drivers', I:BarChart2 },
     { id:'market',        l:'Market',        I:TrendingUp },
     { id:'scenarios',     l:'Scenarios',     I:Zap },
-    { id:'intelligence',  l:'Intelligence',  I:Brain },
   ];
   const currency   = txType === 'rent' ? 'TND/mo' : 'TND';
   const priceLabel = txType === 'rent' ? 'Monthly Rent Estimate' : 'Estimated Market Value';
@@ -746,47 +745,6 @@ function Results({ result, txType }) {
                 </p>
                 <ScenariosPanel scenarios={result.scenarios} currency={currency} />
               </Card>
-            </div>
-          )}
-
-          {tab === 'intelligence' && (
-            <div className="space-y-4">
-              <Card title="Model & Pipeline Info" icon={Info}>
-                <div className="space-y-2 text-sm">
-                  {[
-                    { k:'Prediction Mode',  v:result.prediction_mode },
-                    { k:'Sentiment Mode',   v:result.sentiment_mode },
-                    { k:'CV Mode',          v:result.cv_mode },
-                    { k:'Explanation Mode', v:result.explanation_mode },
-                    { k:'Uncertainty Mode', v:result.uncertainty_mode },
-                    { k:'Model Version',    v:result.model_info?.version },
-                  ].map(({ k, v }) => (
-                    <div key={k} className="flex justify-between border-b border-white/5 pb-1.5">
-                      <span className="text-gray-500">{k}</span>
-                      <span className="font-mono text-gray-200">{v||'—'}</span>
-                    </div>
-                  ))}
-                  {result.model_info?.note && (
-                    <div className="mt-2 rounded-lg border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-xs text-blue-300">
-                      {result.model_info.note}
-                    </div>
-                  )}
-                </div>
-              </Card>
-              <Card title="Vision / Image Analysis" icon={Eye}>
-                <ImageAnalysis ia={result.image_analysis} />
-              </Card>
-              {result.uncertainty_reasons?.length > 0 && (
-                <Card title="Uncertainty Reasons" icon={AlertCircle}>
-                  <ul className="space-y-1.5">
-                    {result.uncertainty_reasons.map((r,i) => (
-                      <li key={i} className="flex gap-2 text-xs text-gray-400">
-                        <AlertCircle size={12} className="mt-0.5 flex-shrink-0 text-amber-400" />{r}
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
-              )}
             </div>
           )}
 

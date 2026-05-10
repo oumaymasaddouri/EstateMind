@@ -59,7 +59,14 @@ function AppLayout() {
           <Route path="/analyze" element={<AnalyzePage />} />
 
           {/* Valuate Route */}
-          <Route path="/valuate" element={<ValuatePage />} />
+          <Route
+            path="/valuate"
+            element={
+              <ProtectedRoute>
+                <ValuatePage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Invest Routes — require authentication */}
           <Route

@@ -6,12 +6,11 @@ Clamped [30, 92].
 """
 
 _MODE_QUALITY = {
-    'catboost_by_type':  0.92,
-    'catboost_global':   0.80,
-    'ml_gradient_boost': 0.74,  # Trained gradient-boosting model (listings.csv)
-    'market_data':       0.72,  # CSV median — real data, delegation-level
-    'fallback_model':    0.68,
-    'heuristic':         0.52,
+    'catboost_by_type': 0.92,
+    'catboost_global':  0.80,
+    'market_data':      0.72,   # CSV data-driven — real data, no trained model
+    'fallback_model':   0.68,
+    'heuristic':        0.52,
 }
 
 _LEVELS = [
@@ -21,12 +20,11 @@ _LEVELS = [
 ]
 
 _UNCERTAINTY_BY_MODE = {
-    'catboost_by_type':  0.08,
-    'catboost_global':   0.10,
-    'ml_gradient_boost': 0.11,
-    'market_data':       0.11,
-    'fallback_model':    0.12,
-    'heuristic':         0.14,
+    'catboost_by_type': 0.08,
+    'catboost_global':  0.10,
+    'market_data':      0.11,
+    'fallback_model':   0.12,
+    'heuristic':        0.14,
 }
 
 

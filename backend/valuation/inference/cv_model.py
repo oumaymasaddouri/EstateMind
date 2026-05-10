@@ -2,138 +2,185 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+import numpy as np
+import torch
+
+
+class _ResNet50Wrapper(torch.nn.Module):
+    def __init__(self, num_classes: int) -> None:
+        super().__init__()
+        from torchvision.models import resnet50
+
+        self.model = resnet50(weights=None)
+        self.model.fc = torch.nn.Sequential(
+            torch.nn.Dropout(p=0.2),
+            torch.nn.Linear(self.model.fc.in_features, num_classes),
+        )
+
+    def eval(self):
+        self.model.eval()
+        return self
+
+    def __call__(self, tensor):
+        return self.model(tensor)
 
 
 @dataclass
 class CVPrediction:
     property_type: str
+    confidence: float
+    predicted_class_id: int
+    class_label: str
     image_quality_score: float
     coverage_score: float
-    confidence: float
     status: str
-    warnings: list[str] = field(default_factory=list)
-    model_info: dict[str, Any] = field(default_factory=dict)
+    warnings: list[str]
+    model_info: dict[str, Any]
 
 
 class CVModelService:
-    """Load and use pre-trained ResNet50 CV model for property type classification."""
+    """Load and use pre-trained ResNet50 image classification model."""
 
     def __init__(self, artifacts_dir: str | Path | None = None) -> None:
         root = Path(__file__).resolve().parents[3]
         self.artifacts_dir = Path(artifacts_dir) if artifacts_dir else root / "backend" / "valuation" / "artifacts" / "models"
         self.model_path = self.artifacts_dir / "image_property_type_fallback.pt"
         self.labels_path = self.artifacts_dir / "image_property_type_fallback.labels.json"
-
+        
         self._model: Any | None = None
-        self._labels: list[str] | None = None
-        self._transform: Any | None = None
+        self._labels: dict[str, Any] | None = None
+        self._class_map: dict[int, str] | None = None
 
-    def _load_model(self) -> bool:
-        if self._model is not None:
-            return True
-        if not self.model_path.exists():
-            return False
+    def _load_labels(self) -> dict[int, str] | None:
+        """Load class labels from JSON manifest."""
+        if self._class_map is not None:
+            return self._class_map
+        
+        if not self.labels_path.exists():
+            return None
+        
         try:
-            import torch
-            import torchvision.transforms as T
-            import json
-
-            self._model = torch.load(self.model_path, map_location="cpu", weights_only=False)
-            self._model.eval()
-
-            if self.labels_path.exists():
-                with open(self.labels_path) as f:
-                    self._labels = json.load(f)
-            else:
-                self._labels = ["apartment", "house", "land", "commercial"]
-
-            self._transform = T.Compose([
-                T.Resize((224, 224)),
-                T.ToTensor(),
-                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ])
-            return True
+            data = json.loads(self.labels_path.read_text(encoding="utf-8"))
+            self._labels = data
+            self._class_map = {
+                int(cls["id"]): str(cls["label"]).lower()
+                for cls in data.get("classes", [])
+            }
+            return self._class_map
         except Exception:
-            return False
-
-    def analyze_images(self, image_files: list) -> CVPrediction | None:
-        """Analyze images for property type classification."""
-        if not image_files:
             return None
 
-        model_available = self._load_model()
+    def _load_model(self) -> Any:
+        """Lazy-load the ResNet50 checkpoint as a PyTorch module."""
+        if self._model is not None:
+            return self._model
+        
+        if not self.model_path.exists():
+            return None
+        
+        try:
+            checkpoint = torch.load(self.model_path, map_location="cpu")
+            state_dict = checkpoint.get("state_dict") if isinstance(checkpoint, dict) else None
+            num_classes = int((checkpoint or {}).get("num_classes", 3)) if isinstance(checkpoint, dict) else 3
+            if not state_dict:
+                return None
 
-        if not model_available:
-            coverage = min(len(image_files) / 4.0, 1.0)
+            model = _ResNet50Wrapper(num_classes=num_classes)
+            model.load_state_dict(state_dict, strict=True)
+            self._model = model.eval()
+            return self._model
+        except Exception:
+            return None
+
+    def analyze_images(self, image_files: list[Any]) -> CVPrediction | None:
+        """
+        Analyze uploaded images for property type and quality.
+        
+        Args:
+            image_files: List of InMemoryUploadedFile objects from Django request
+            
+        Returns:
+            CVPrediction with property type and quality metrics, or None if no images
+        """
+        if not image_files or len(image_files) == 0:
+            return None
+        
+        model = self._load_model()
+        labels = self._load_labels()
+        
+        if model is None or labels is None:
             return CVPrediction(
                 property_type="unknown",
-                image_quality_score=0.5,
-                coverage_score=round(coverage, 2),
                 confidence=0.0,
-                status="model_unavailable",
+                predicted_class_id=-1,
+                class_label="model_unavailable",
+                image_quality_score=0.0,
+                coverage_score=0.0,
+                status="model_load_failed",
                 warnings=["cv_model_not_available"],
                 model_info={"status": "model_unavailable"},
             )
-
+        
         try:
             import torch
-            from PIL import Image as PILImage
+            from PIL import Image
             import io
-
-            type_votes: dict[str, float] = {}
-            quality_scores: list[float] = []
-
-            for img_file in image_files:
-                try:
-                    data = img_file.read()
-                    img_file.seek(0)
-                    img = PILImage.open(io.BytesIO(data)).convert("RGB")
-                    w, h = img.size
-                    res_score = min((w * h) / (1280 * 720), 1.0)
-                    quality_scores.append(res_score)
-
-                    tensor = self._transform(img).unsqueeze(0)
-                    with torch.no_grad():
-                        logits = self._model(tensor)
-                        probs = torch.softmax(logits, dim=1)[0]
-
-                    for i, prob in enumerate(probs.tolist()):
-                        label = self._labels[i] if i < len(self._labels) else f"class_{i}"
-                        type_votes[label] = type_votes.get(label, 0.0) + prob
-                except Exception:
-                    quality_scores.append(0.5)
-
-            best_type = max(type_votes, key=type_votes.__getitem__) if type_votes else "unknown"
-            total_votes = sum(type_votes.values()) or 1.0
-            confidence = type_votes.get(best_type, 0.0) / total_votes
-
-            avg_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0.5
-            coverage = min(len(image_files) / 4.0, 1.0)
-
+            
+            # Process first image only for now
+            img_file = image_files[0]
+            img = Image.open(io.BytesIO(img_file.read())).convert("RGB")
+            
+            # Resize to expected input size (typically 224x224 for ResNet50)
+            img = img.resize((224, 224))
+            
+            # Normalize and convert to tensor
+            img_array = np.array(img).astype(np.float32) / 255.0
+            img_array = (img_array - np.array([0.485, 0.456, 0.406], dtype=np.float32)) / np.array([0.229, 0.224, 0.225], dtype=np.float32)
+            img_tensor = torch.from_numpy(img_array.transpose(2, 0, 1).astype(np.float32)).unsqueeze(0)
+            
+            # Predict
+            with torch.no_grad():
+                output = model(img_tensor)
+            
+            # Get probabilities and class
+            probabilities = torch.softmax(output, dim=1).cpu().numpy()[0]
+            predicted_class_id = int(np.argmax(probabilities))
+            confidence = float(probabilities[predicted_class_id])
+            predicted_label = labels.get(predicted_class_id, "unknown")
+            
+            # Estimate image quality (simple heuristic based on variance)
+            img_gray = np.array(img).mean(axis=2)
+            quality_score = min(1.0, float(np.std(img_gray) / 100.0))
+            
             return CVPrediction(
-                property_type=best_type,
-                image_quality_score=round(avg_quality, 3),
-                coverage_score=round(coverage, 2),
-                confidence=round(confidence, 3),
+                property_type=predicted_label,
+                confidence=confidence,
+                predicted_class_id=predicted_class_id,
+                class_label=predicted_label,
+                image_quality_score=quality_score,
+                coverage_score=0.8 if quality_score > 0.5 else 0.4,
                 status="success",
-                warnings=[],
+                warnings=[] if confidence > 0.7 else ["low_confidence_prediction"],
                 model_info={
-                    "model": "resnet50_property_type",
-                    "image_count": len(image_files),
-                    "type_distribution": {k: round(v / total_votes, 3) for k, v in type_votes.items()},
+                    "model_name": self._labels.get("model_name", "resnet50") if self._labels else "resnet50",
+                    "num_images_analyzed": len(image_files),
+                    "confidence": confidence,
                 },
             )
         except Exception as exc:
-            coverage = min(len(image_files) / 4.0, 1.0)
             return CVPrediction(
                 property_type="unknown",
-                image_quality_score=0.5,
-                coverage_score=round(coverage, 2),
                 confidence=0.0,
-                status="inference_error",
-                warnings=[f"cv_inference_error: {str(exc)}"],
+                predicted_class_id=-1,
+                class_label="analysis_failed",
+                image_quality_score=0.0,
+                coverage_score=0.0,
+                status="analysis_error",
+                warnings=[f"cv_analysis_error: {str(exc)}"],
                 model_info={"error": str(exc)},
             )

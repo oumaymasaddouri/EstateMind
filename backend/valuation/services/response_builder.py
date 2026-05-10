@@ -15,9 +15,38 @@ def build(
     image_analysis: dict | None = None,
     scenarios: list | None = None,
     recommendations: list | None = None,
+    cv_analysis_signals: dict | None = None,
+    text_analysis_signals: dict | None = None,
+    prediction_source: str | None = None,
 ) -> dict:
     estimated = int(prediction.get('estimated_price', 0))
     ppm2 = float(prediction.get('price_per_m2', 0))
+    # Filter internal warnings so users don't see internal telemetry
+    internal_prefixes = (
+        "catboost_signal_adjustment_",
+        "cv_images_analyzed_",
+    )
+    internal_exact = (
+        "reference_dataset_missing",
+        "ood:processor_unavailable",
+        "ood:text_quality_poor",
+    )
+
+    raw_warnings = prediction.get('warnings', []) or []
+    user_warnings = []
+    internal_warnings = []
+    for w in raw_warnings:
+        if any(w.startswith(p) for p in internal_prefixes) or w in internal_exact or (isinstance(w, str) and w.startswith('ood:')):
+            internal_warnings.append(w)
+        else:
+            user_warnings.append(w)
+
+    # Log internal warnings for operators
+    if internal_warnings:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.debug("Internal model warnings suppressed from user output: %s", internal_warnings)
 
     return {
         # Price predictions
@@ -46,7 +75,7 @@ def build(
 
         # Explainability
         'ai_explanation':  ai_explanation,
-        'explanation_mode': 'true_shap' if prediction.get('prediction_mode', '').startswith('catboost') else 'heuristic_attribution',
+        'explanation_mode': 'model_based' if prediction.get('prediction_mode', '').startswith(('catboost', 'fallback_model')) else 'rule_based',
 
         # Text & Vision analysis
         'text_analysis':  text_analysis,
@@ -60,19 +89,33 @@ def build(
 
         # Prediction metadata
         'prediction_mode': prediction.get('prediction_mode', 'heuristic'),
+        'prediction_source': prediction_source or 'unknown',
         'sentiment_mode':  text_analysis.get('sentiment_mode', 'neutral_fallback'),
         'cv_mode':         image_analysis.get('cv_mode', 'no_cv') if image_analysis else 'no_cv',
         'vision_guidance': [],
-        'warnings':        prediction.get('warnings', []),
+        # Expose only user-facing warnings; internal telemetry is suppressed
+        'warnings':        user_warnings,
         'model_info': {
             'mode':    prediction.get('prediction_mode', 'heuristic'),
             'version': '2.0.0',
+            'source': prediction_source or 'unknown',
+            'cv_signals_applied': cv_analysis_signals is not None,
+            'text_signals_applied': text_analysis_signals is not None,
+            'cv_signal_values': cv_analysis_signals or {},
+            'text_signal_values': text_analysis_signals or {},
             'note':    (
-                'Powered by real market data from Tunisian listings.'
-                if prediction.get('prediction_mode') == 'market_data'
-                else 'Using calibrated market priors — add more details to improve accuracy.'
+                ('Powered by trained valuation models and local market priors'
+                + (', enhanced with CV and sentiment analysis' if (cv_analysis_signals or text_analysis_signals) else '')
+                + '.')
+                if prediction.get('prediction_mode', '').startswith(('catboost', 'fallback_model'))
+                else 'Using calibrated market priors.'
             ),
         },
+
+        # UI flags and notifications (popups)
+        'user_notifications': [],
+        # Frontend should hide any intelligence window when present
+        'intelligence_window': False,
 
         # Scenario simulation
         'scenarios':       scenarios or [],

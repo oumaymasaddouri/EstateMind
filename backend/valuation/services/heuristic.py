@@ -203,20 +203,13 @@ def estimate(data: dict) -> dict:
     use_csv  = csv_ppm2 is not None and csv_ppm2 > 0
 
     if use_csv:
-        # CSV market data: most accurate — already encodes all location effects
-        base_ppm2   = round(csv_ppm2)
-        gov_mult    = 1.0
-        deleg_adj   = 0.0
+        # CSV already encodes all location effects — no gov/deleg mult needed
+        base_ppm2  = round(csv_ppm2)
+        gov_mult   = 1.0
+        deleg_adj  = 0.0
         unknown_gov = False
         prediction_mode = 'market_data'
     else:
-        # Try trained ML model before falling back to heuristic constants
-        from . import ml_service
-        ml_result = ml_service.predict(data)
-        if ml_result is not None:
-            # ML fills the gap for locations not covered by the CSV engine
-            return _apply_adjustments(data, ml_result)
-
         base_ppm2   = (BASE_PRICE_RENT if tx_type == 'rent' else BASE_PRICE_SALE).get(ptype, 1_800)
         gov_key     = gov_raw.lower()
         gov_mult    = GOVERNORATE_MULT.get(gov_key, 0.85)
@@ -306,64 +299,4 @@ def estimate(data: dict) -> dict:
         'warnings':          warnings,
         'uncertainty_reasons': uncertainty_reasons,
         'csv_ppm2_used':     csv_ppm2,
-    }
-
-
-def _apply_adjustments(data: dict, base_result: dict) -> dict:
-    """
-    Apply condition, amenity, and NLP adjustments on top of an ML base prediction.
-    Returns an updated result dict with prediction_mode preserved from base_result.
-    """
-    ptype_raw = (data.get('property_type') or 'apartment').lower().strip()
-    ptype     = _TYPE_ALIAS.get(ptype_raw, ptype_raw)
-    size_m2   = float(data.get('size_m2') or 120)
-    condition = (data.get('condition') or 'good').lower().strip()
-    bedrooms  = data.get('bedrooms')
-    desc      = (data.get('description') or '').lower()
-
-    base_ppm2 = base_result['price_per_m2']
-
-    cond_adj = CONDITION_ADJ.get(condition, 0.0)
-    br_fact  = _bedroom_factor(bedrooms, size_m2)
-
-    active_amenities: dict[str, float] = {}
-    if ptype != 'land':
-        for field, adj in AMENITY_ADJ.items():
-            if data.get(field):
-                active_amenities[field] = adj
-    amenity_total = sum(active_amenities.values())
-
-    pos = sum(1 for kw in _POS_KW if kw in desc)
-    neg = sum(1 for kw in _NEG_KW if kw in desc)
-    total_kw  = pos + neg or 1
-    desc_bonus = max(-0.02, min(0.02, (pos - neg) / (total_kw * 5)))
-
-    adj_mult = (1 + cond_adj + amenity_total + desc_bonus) * br_fact
-    ppm2     = base_ppm2 * adj_mult
-    total    = ppm2 * size_m2
-
-    contributions = dict(base_result.get('contributions', {}))
-    for field, adj in active_amenities.items():
-        contributions[AMENITY_LABELS[field]] = base_ppm2 * adj * size_m2
-    if cond_adj:
-        contributions['condition'] = base_ppm2 * cond_adj * size_m2
-    if desc_bonus:
-        contributions['description_quality'] = base_ppm2 * desc_bonus * size_m2
-
-    warnings = list(base_result.get('warnings', []))
-    if size_m2 < 15 or size_m2 > 10_000:
-        warnings.append(f"Unusual size ({size_m2:.0f} m²) — estimate may be less reliable.")
-
-    return {
-        **base_result,
-        'estimated_price':   round(total),
-        'price_per_m2':      round(ppm2, 1),
-        'size_factor':       _size_factor(size_m2, ptype),
-        'condition_adj':     cond_adj,
-        'amenity_total':     amenity_total,
-        'desc_bonus':        desc_bonus,
-        'base_total':        round(base_ppm2 * size_m2),
-        'contributions':     contributions,
-        'active_amenities':  list(active_amenities.keys()),
-        'warnings':          warnings,
     }

@@ -1,4 +1,5 @@
-"""Dynamic serving bundles for EstateMind valuation artifacts."""
+"""Dynamic serving bundles for EstateMind valuation artifacts.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +7,7 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -25,6 +26,7 @@ REFERENCE_DATASET_CANDIDATES = (
     Path("data/csv/final_listings_preprocessed.csv"),
 )
 
+# trimmed constants (same as upstream)
 CATEGORICAL_COLUMNS = ("city", "governorate", "property_type", "transaction_type")
 NUMERIC_COLUMNS = (
     "price_tnd",
@@ -243,7 +245,7 @@ class _ServingProcessor:
                     ood_flags.append("unknown_city_missing_input")
         if "surface_m2" in self.quantiles:
             lo, hi = self.quantiles["surface_m2"]
-            surface = float(frame["surface_m2"].iat[0])  # type: ignore
+            surface = float(frame["surface_m2"].iat[0]) #type:ignore
             if surface < lo or surface > hi:
                 ood_flags.append("surface_out_of_range")
 
@@ -303,7 +305,7 @@ class _ServingProcessor:
             neighbors = self.tree.query_radius(query_rad, r=self.radius_km / 6371.0)
             avg_prices: list[float] = []
             densities: list[float] = []
-            area = np.pi * (self.radius_km ** 2)
+            area = np.pi * (self.radius_km**2)
             for idx in neighbors:
                 idx_list = idx.tolist()
                 if not idx_list:
@@ -328,13 +330,13 @@ class InferenceBundle:
     property_scope: str
     reference_rows: int
     feature_columns: list[str]
-    processor: _ServingProcessor
+    processor: Optional[_ServingProcessor]
     source_path: Path
     uses_proxy_price_features: bool = False
     version: str = "estatebundle-v1"
 
     @classmethod
-    def from_handle(cls, handle: "ModelHandle", reference_df: pd.DataFrame) -> "InferenceBundle":
+    def from_handle(cls, handle: "ModelHandle", reference_df: pd.DataFrame | None) -> "InferenceBundle":
         estimator = handle.estimator
         if estimator is None:
             raise ValueError("Estimator must be loaded before bundle creation")
@@ -344,13 +346,23 @@ class InferenceBundle:
         if handle.model_name.lower() != "catboost":
             raise ValueError("Unsupported artifact: only catboost serving bundles are implemented")
 
-        subset = reference_df.copy()
-        if handle.scope == "by_type" and handle.property_type and handle.property_type.upper() != "ALL":
+        subset = reference_df.copy() if reference_df is not None else pd.DataFrame()
+        if (
+            handle.scope == "by_type"
+            and handle.property_type
+            and handle.property_type.upper() != "ALL"
+            and not subset.empty
+            and "property_type" in subset.columns
+        ):
             mask = subset["property_type"].astype(str).str.strip().str.lower() == handle.property_type.strip().lower()
             typed = subset[mask].copy()
             if not typed.empty:
                 subset = typed
-        processor = _ServingProcessor(subset)
+        processor: Optional[_ServingProcessor] = None
+        try:
+            processor = _ServingProcessor(subset) if not subset.empty else None
+        except Exception:
+            processor = None
         return cls(
             estimator=estimator,
             model_name=handle.model_name,
@@ -362,7 +374,13 @@ class InferenceBundle:
             uses_proxy_price_features=("price_tnd" in feature_columns or "price_per_m2" in feature_columns),
         )
 
-    def predict(self, mapped: dict[str, Any], market_context: dict[str, Any]) -> PredictionResult:
+    def predict(
+        self,
+        mapped: dict[str, Any],
+        market_context: dict[str, Any],
+        cv_analysis: dict[str, Any] | None = None,
+        text_analysis: dict[str, Any] | None = None,
+    ) -> PredictionResult:
         seed_ppm = market_context.get("avg_price_per_m2") or market_context.get("avg_m2") or 1450
         seed_ppm = max(float(seed_ppm or 1450), 1.0)
         proxy_price = float(mapped["surface_m2"]) * seed_ppm
@@ -382,13 +400,117 @@ class InferenceBundle:
             "longitude": float(mapped["longitude"]) if mapped.get("longitude") is not None else np.nan,
         }
 
-        transformed, warnings, ood_flags = self.processor.transform_request(request_row)
+        # Handle missing processor gracefully
+        if self.processor is not None:
+            transformed, warnings, ood_flags = self.processor.transform_request(request_row)
+        else:
+            warnings = ["reference_dataset_missing"]
+            ood_flags = ["processor_unavailable"]
+            transformed = pd.DataFrame([request_row])
+            for col in self.feature_columns:
+                if col not in transformed.columns:
+                    transformed[col] = np.nan
+            
+            # Create derived features that processor would normally create
+            if "city_governorate" in self.feature_columns and "city_governorate" not in transformed.columns:
+                city_col = transformed["city"].fillna("unknown").astype(str) if "city" in transformed.columns else "unknown"
+                gov_col = transformed["governorate"].fillna("unknown").astype(str) if "governorate" in transformed.columns else "unknown"
+                transformed["city_governorate"] = city_col + "__" + gov_col
+            
+            # Create market context features with defaults
+            if "local_avg_price_m2" in self.feature_columns and "local_avg_price_m2" not in transformed.columns:
+                transformed["local_avg_price_m2"] = seed_ppm
+            
+            if "gov_avg_price_m2" in self.feature_columns and "gov_avg_price_m2" not in transformed.columns:
+                transformed["gov_avg_price_m2"] = seed_ppm
+            
+            if "size_x_local_price" in self.feature_columns and "size_x_local_price" not in transformed.columns:
+                transformed["size_x_local_price"] = float(mapped.get("surface_m2", 0)) * seed_ppm
+
+        # Integrate CV and sentiment signals
+        cv_signal_multiplier = 1.0
+        text_signal_multiplier = 1.0
+
+        if cv_analysis is not None:
+            try:
+                quality_score = float(cv_analysis.get("quality_score", 0.5))
+                coverage_score = float(cv_analysis.get("coverage_score", 0.5))
+                cv_confidence = float(cv_analysis.get("confidence", 0.0))
+                image_count = int(cv_analysis.get("image_count", 0))
+
+                # CV signal: comprehensive images indicate better property condition
+                cv_signal_multiplier = 1.0 + (coverage_score * 0.1) + (quality_score * 0.05)
+                cv_signal_multiplier = min(cv_signal_multiplier, 1.2)  # Cap at 20% boost
+                if cv_confidence > 0.7:
+                    warnings.append("cv_confidence_high")
+                if image_count > 0:
+                    warnings.append(f"cv_images_analyzed_{image_count}")
+            except Exception as e:
+                warnings.append(f"cv_signal_error: {str(e)[:50]}")
+
+        if text_analysis is not None:
+            try:
+                sentiment_score = float(text_analysis.get("sentiment_score", 0.5))
+                description_quality = str(text_analysis.get("description_quality", "poor")).lower()
+
+                # Sentiment signal: positive descriptions correlate with buyer appeal
+                text_signal_multiplier = 0.95 + (sentiment_score * 0.1)  # Range [0.95, 1.05]
+                if description_quality == "good":
+                    text_signal_multiplier += 0.05
+                    warnings.append("text_quality_good")
+                elif description_quality == "poor":
+                    text_signal_multiplier -= 0.05
+                    ood_flags.append("text_quality_poor")
+
+                text_signal_multiplier = max(0.9, min(text_signal_multiplier, 1.15))
+            except Exception as e:
+                warnings.append(f"text_signal_error: {str(e)[:50]}")
+
         missing_columns = [col for col in self.feature_columns if col not in transformed.columns]
         if missing_columns:
             raise ValueError(f"schema mismatch: missing transformed columns {missing_columns}")
         features = transformed[self.feature_columns].copy()
+        
+        # Get categorical feature indices from model if available
+        cat_feature_indices = []
+        if hasattr(self.estimator, "get_cat_feature_indices"):
+            try:
+                cat_feature_indices = list(self.estimator.get_cat_feature_indices())
+            except Exception:
+                pass
+        
+        # If no cat_feature_indices, use known categorical feature names
+        if not cat_feature_indices:
+            categorical_names = {"transaction_type", "property_type", "governorate", "city", "city_governorate"}
+            cat_feature_indices = [
+                i for i, col in enumerate(self.feature_columns) if col in categorical_names
+            ]
+        
+        # Convert categorical features to proper strings FIRST (before any other handling)
+        # This is crucial: fill NaN -> "unknown", then convert to plain string dtype
+        for idx in cat_feature_indices:
+            if idx < len(self.feature_columns):
+                col = self.feature_columns[idx]
+                if col in features.columns:
+                    # Fill NaN first, then convert to plain string (not StringDtype)
+                    features[col] = features[col].fillna("unknown").astype(str)
+        
+        # Handle NaN in numeric features
+        for i, col in enumerate(self.feature_columns):
+            if i not in cat_feature_indices and col in features.columns:
+                if features[col].isna().any():
+                    median_val = features[col].median()
+                    features[col] = features[col].fillna(median_val if not pd.isna(median_val) else 0)
+        
         pred_log = float(self.estimator.predict(features)[0])
         pred_price = int(round(float(np.expm1(pred_log))))
+
+        # Apply multi-signal adjustment to price
+        multi_signal_adjustment = cv_signal_multiplier * text_signal_multiplier
+        if multi_signal_adjustment != 1.0:
+            pred_price = int(round(pred_price * multi_signal_adjustment))
+            warnings.append(f"catboost_signal_adjustment_{multi_signal_adjustment:.2f}")
+
         pred_ppm = int(round(pred_price / max(float(mapped["surface_m2"]), 1.0)))
 
         if self.uses_proxy_price_features:
@@ -411,6 +533,8 @@ class InferenceBundle:
                 "property_scope": self.property_scope,
                 "source_path": str(self.source_path),
                 "reference_rows": self.reference_rows,
+                "cv_signals_applied": cv_analysis is not None,
+                "text_signals_applied": text_analysis is not None,
             },
             feature_frame=features,
             uncertainty_reasons=sorted(set(uncertainty_reasons)),
